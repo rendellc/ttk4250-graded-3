@@ -45,8 +45,8 @@ class EKFSLAM:
             the predicted state
         """
         xpred = np.array([
-            x[0] + u[0]]*np.cos(x[2]) - u[1]]*np.sin(x[2]),
-            x[1] + u[0]]*np.sin(x[2]) + u[1]]*np.cos(x[2]),
+            x[0] + u[0]*np.cos(x[2]) - u[1]*np.sin(x[2]),
+            x[1] + u[0]*np.sin(x[2]) + u[1]*np.cos(x[2]),
             x[2] + u[2]
         ])
 
@@ -138,7 +138,7 @@ class EKFSLAM:
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + Q
+        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + self.Q
         P[:3, 3:] = Fx @ P[:3,3:]
         P[3:, :3] = P[:3,3:].T
 
@@ -174,11 +174,11 @@ class EKFSLAM:
 
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
-        delta_m = m - x[:2]
+        delta_m = (m.T - x[:2]).T
         # m = (2, 1000)
         # x = (2,)
 
-        zpredcart = Rot @ delta_m - self.sensor_offset
+        zpredcart = Rot @ delta_m - self.sensor_offset.reshape((2,1))
         # (2x2) @ (2,1000)
 
         zpred_r = la.norm(zpredcart,axis=0)
@@ -220,9 +220,9 @@ class EKFSLAM:
 
         Rot = rotmat2d(x[2])
 
-        delta_m = m - x[:2]
+        delta_m = (m.T - x[:2]).T
 
-        zc = delta_m - Rot @ self.sensor_offset
+        zc = delta_m - Rot @ self.sensor_offset.reshape((2,1))
         # (2, #measurements), each measured position in cartesian coordinates like
         # [x coordinates;
         #  y coordinates]
@@ -251,11 +251,11 @@ class EKFSLAM:
             ind = 2 * i # starting postion of the ith landmark into H
             inds = slice(ind, ind + 2)  # the inds slice for the ith landmark into H
             
-            zc_norm = la.norm(zc[:,ind])
-            zc_unit = zc[:,ind]/zc_norm
-            jac_z_cb[:,2] = -Rpihalf @ delta_m[:,ind]
+            zc_norm = la.norm(zc[:,i])
+            zc_unit = zc[:,i]/zc_norm
+            jac_z_cb[:,2] = -Rpihalf @ delta_m[:,i]
             # TODO: Set H or Hx and Hm here
-            Hx[inds] = np.vstack([z_unit.T, zc_unit.T @ Rpihalf.T / zc_norm]) @ jac_z_cb
+            Hx[inds] = np.vstack([zc_unit.T, zc_unit.T @ Rpihalf.T / zc_norm]) @ jac_z_cb
 
             Hm[inds,inds] = np.vstack([
                 zc_unit.T,
@@ -308,14 +308,14 @@ class EKFSLAM:
             zr, zb = zj
 
             rot = rotmat2d(zb + x[2])
-            zc = zr*np.array([np.cos(zb+x[2],np.sin(zb+x[2]))]) \
+            zc = zr*np.array([np.cos(zb+x[2]),np.sin(zb+x[2])]) \
                 + sensor_offset_world
             lmnew[inds] = x[:2] + zc
             # TODO, calculate position of new landmark in world frame
 
             Gx[inds, :2] = I2
             Gx[inds, 2] = zr * np.array([-np.sin(zb+x[2]), np.cos(zb+x[2])]) \
-                + sensor_offset_world_der)
+                + sensor_offset_world_der
 
             Gz = rot @ np.diag([1,zr])
 
@@ -323,11 +323,11 @@ class EKFSLAM:
             # TODO, Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
 
         assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
-        etaadded = np.vstack([eta, lmnew])
-        Padded = block_diag(P, Gx @ P[:3,:3] @ Gx.T + Rall)) 
+        etaadded = np.array([*eta, *lmnew])
+        Padded = block_diag(P, Gx @ P[:3,:3] @ Gx.T + Rall)
         # TODO, block diagonal of P_new, see problem text in 1g) in graded assignment 3
-        Padded[n:, :n] = P[:,:3] @ Gx.T
-        Padded[:n, n:] = Padded[n:, :n].T
+        Padded[:n, n:] = P[:,:3] @ Gx.T
+        Padded[n:, :n] = Padded[:n, n:].T
 
         assert (
             etaadded.shape * 2 == Padded.shape
@@ -456,13 +456,15 @@ class EKFSLAM:
                 #
                 # S.T @ W.T = (P @ H.T).T
                 # A x = b => x = A^-1 b
-                W = la.cho_solve(S_cho_factors_t, (P @ H.T).T).T
+                W = P @ Ha.T @ la.inv(Sa) #la.cho_solve(S_cho_factors, (P @ Ha.T).T).T
                 etaupd = eta + W @ v
 
                 # Kalman cov update: use Joseph form for stability
                 jo = -W @ Ha
                 jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
-                Pupd = jo @ P @ jo.T + W @ R @ W.T
+                
+                Ra = R[:len(za),:len(za)]
+                Pupd = jo @ P @ jo.T + W @ Ra @ W.T
 
                 # calculate NIS, can use S_cho_factors
                 NIS = v.T @ la.cho_solve(S_cho_factors, v)

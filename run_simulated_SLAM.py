@@ -10,6 +10,7 @@ from matplotlib import animation
 from scipy.stats import chi2
 import utils
 
+
 try:
     from tqdm import tqdm
 except ImportError as e:
@@ -96,14 +97,13 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = # TODO
-R = # TODO
+Q = np.diag([0.9,0.8,0.02])**2
+R = np.diag([0.4,np.deg2rad(10)])**2
 
 doAsso = True
 
-JCBBalphas = np.array(
-    # TODO,
-)  # first is for joint compatibility, second is individual
+JCBBalphas = np.array([0.05, 0.1])
+# first is for joint compatibility, second is individual
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
@@ -143,10 +143,10 @@ print("starting sim (" + str(N) + " iterations)")
 
 for k, z_k in tqdm(enumerate(z[:N])):
 
-    eta_hat[k], P_hat[k], NIS[k], a[k] = # TODO update
+    eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k], P_pred[k], z_k)
 
     if k < K - 1:
-        eta_pred[k + 1], P_pred[k + 1] = # TODO predict
+        eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k], P_hat[k], odometry[k])
 
     assert (
         eta_hat[k].shape[0] == P_hat[k].shape[0]
@@ -163,7 +163,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
         NISnorm[k] = 1
         CInorm[k].fill(1)
 
-    NEESes[k] = # TODO, use provided function slam.NEESes
+    NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k])
 
     if doAssoPlot and k > 0:
         axAsso.clear()
