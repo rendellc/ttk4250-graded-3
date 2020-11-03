@@ -131,14 +131,14 @@ class EKFSLAM:
         etapred[3:] = eta[3:]
 
         Fx = self.Fx(x, z_odo)
-        # Fu = self.Fu(x, z_odo)
+        Fu = self.Fu(x, z_odo)
 
         # evaluate covariance prediction in place to save computation
         # only robot state changes, so only rows and colums of robot state needs changing
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + self.Q
+        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + Fu @ self.Q @ Fu.T
         P[:3, 3:] = Fx @ P[:3,3:]
         P[3:, :3] = P[:3,3:].T
 
@@ -439,7 +439,7 @@ class EKFSLAM:
             if za.shape[0] == 0:
                 etaupd = eta
                 Pupd = P
-                NIS = np.nan #1 # TODO: beware this one when analysing consistency.
+                NIS = 1 # TODO: beware this one when analysing consistency.
 
             else:
                 # Create the associated innovation
@@ -453,10 +453,9 @@ class EKFSLAM:
                 # S.T @ W.T = PHT.T
                 # A @ x = b
 
-                #
                 # S.T @ W.T = (P @ H.T).T
                 # A x = b => x = A^-1 b
-                W = P @ Ha.T @ la.inv(Sa) #la.cho_solve(S_cho_factors, (P @ Ha.T).T).T
+                W = la.cho_solve(S_cho_factors, (P @ Ha.T).T).T
                 etaupd = eta + W @ v
 
                 # Kalman cov update: use Joseph form for stability
@@ -478,9 +477,9 @@ class EKFSLAM:
         else:  # All measurements are new landmarks,
             a = np.full(z.shape[0], -1)
             z = z.flatten()
-            NIS = 0 # TODO: beware this one, you can change the value to for instance 1
             etaupd = eta
             Pupd = P
+            NIS = 0 # TODO: beware this one, you can change the value to for instance 1
 
         # Create new landmarks if any is available
         if self.do_asso:

@@ -98,7 +98,7 @@ M = len(landmarks)
 
 # %% Initilize
 Q = np.diag([0.9,0.8,0.02])**2
-R = np.diag([0.4,np.deg2rad(10)])**2
+R = np.diag([0.1,np.deg2rad(1)])**2
 
 doAsso = True
 
@@ -132,7 +132,7 @@ P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
 # plotting
 
 doAssoPlot = False
-playMovie = True
+playMovie = False
 if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
