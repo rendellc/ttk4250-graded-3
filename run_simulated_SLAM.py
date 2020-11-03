@@ -10,6 +10,8 @@ from matplotlib import animation
 from scipy.stats import chi2
 import utils
 
+import latexutils
+
 
 try:
     from tqdm import tqdm
@@ -77,6 +79,22 @@ except Exception as e:
 from EKFSLAM import EKFSLAM
 from plotting import ellipse
 
+FIG_DIR = "figs/"
+parameters = dict(
+    sigma_xy = 0.01,
+    sigma_psi = np.deg2rad(1),
+    sigma_range = 0.1,
+    sigma_bearing = np.deg2rad(1),
+    alpha_individual = 0.05,
+    alpha_joint = 0.05,
+)
+p = parameters
+
+latexutils.save_params_to_csv(
+    latexutils.parameter_to_texvalues(parameters),
+    FIG_DIR + "parameters.csv")
+
+
 # %% Load data
 simSLAM_ws = loadmat("simulatedSLAM")
 
@@ -97,12 +115,12 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.9,0.8,0.02])**2
-R = np.diag([0.1,np.deg2rad(1)])**2
+Q = np.diag([p["sigma_xy"],p["sigma_xy"],p["sigma_psi"]])**2
+R = np.diag([p["sigma_range"],p["sigma_bearing"]])**2
 
 doAsso = True
 
-JCBBalphas = np.array([0.05, 0.1])
+JCBBalphas = np.array([p["alpha_joint"], p["alpha_individual"]])
 # first is for joint compatibility, second is individual
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
@@ -217,6 +235,8 @@ ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
 ax2.axis("equal")
 ax2.grid()
 
+latexutils.savefig(fig2, FIG_DIR + "trajectory")
+
 # %% Consistency
 
 # NIS
@@ -228,6 +248,8 @@ ax3.plot(CInorm[:N,1], '--')
 ax3.plot(NISnorm[:N], lw=0.5)
 
 ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
+
+latexutils.savefig(fig3, FIG_DIR + "NIS")
 
 # NEES
 
@@ -249,6 +271,8 @@ for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
 
 fig4.tight_layout()
 
+latexutils.savefig(fig4, FIG_DIR + "NEES")
+
 # %% RMSE
 
 ylabels = ['m', 'deg']
@@ -268,6 +292,8 @@ for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings)
     ax.grid()
 
 fig5.tight_layout()
+
+latexutils.savefig(fig5, FIG_DIR + "RMSE")
 
 # %% Movie time
 
@@ -311,6 +337,8 @@ if playMovie:
         print(
             "Install celluloid module, \n\n$ pip install celluloid\n\nto get fancy animation of EKFSLAM."
         )
+
+
 
 plt.show()
 # %%
