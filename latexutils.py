@@ -2,6 +2,7 @@ import csv
 from numpy import pi, rad2deg
 
 PARAMETER_TO_TEXNAME = dict(
+    sigma_xy = r"\sigma_\text{xy}",
     sigma_range = r"\sigma_r",
     alpha_joint = r"\alpha_\text{joint}",
     alpha_individual = r"\alpha_\text{individual}",
@@ -29,7 +30,8 @@ def parameter_to_texvalues(params):
             parameter_tex_dict[tex_key] = value
 
     p = params
-    parameter_tex_dict[r"\sigma_\theta"] = rad2deg(p["sigma_bearing"])
+    parameter_tex_dict[r"\sigma_\theta"] = f"{rad2deg(p['sigma_bearing'])}" + r" \text{deg}"
+    parameter_tex_dict[r"\sigma_\psi"] = f"{rad2deg(p['sigma_psi'])}" + r" \text{deg}"
 
     return parameter_tex_dict
 
