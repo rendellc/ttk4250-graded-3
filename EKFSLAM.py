@@ -6,9 +6,11 @@ from utils import rotmat2d
 from JCBB import JCBB
 import utils
 
+# from profilehooks import profile
+
 # import line_profiler
 # import atexit
-
+# 
 # profile = line_profiler.LineProfiler()
 # atexit.register(profile.print_stats)
 
@@ -308,9 +310,9 @@ class EKFSLAM:
             zr, zb = zj
 
             rot = rotmat2d(zb + x[2])
-            zc = zr*np.array([np.cos(zb+x[2]),np.sin(zb+x[2])]) \
-                + sensor_offset_world
-            lmnew[inds] = x[:2] + zc
+            zc = zr*np.array([np.cos(zb+x[2]),np.sin(zb+x[2])])
+                
+            lmnew[inds] = x[:2] + zc + sensor_offset_world
             # TODO, calculate position of new landmark in world frame
 
             Gx[inds, :2] = I2
@@ -395,6 +397,7 @@ class EKFSLAM:
             # should one do something her
             pass
 
+    # @profile
     def update(
         self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:

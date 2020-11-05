@@ -8,6 +8,7 @@ import utils
 chi2isf_cached = lru_cache(maxsize=None)(chi2.isf)
 
 # TODO: make sure a is 0-indexed
+# @profilehooks.profile
 def JCBB(z, zbar, S, alpha1, alpha2):
     assert len(z.shape) == 1, "z must be in one row in JCBB"
     assert z.shape[0] % 2 == 0, "z must be equal in x and y"
@@ -34,7 +35,7 @@ def JCBB(z, zbar, S, alpha1, alpha2):
 
     return abest
 
-
+# @profilehooks.profile
 def JCBBrec(z, zbar, S, alpha1, g2, j, a, ic, abest):
     m = z.shape[0] // 2
     assert isinstance(m, int), "m in JCBBrec must be int"

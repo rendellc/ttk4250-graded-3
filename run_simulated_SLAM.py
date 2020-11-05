@@ -81,12 +81,12 @@ from plotting import ellipse
 
 FIG_DIR = "figs/"
 parameters = dict(
-    sigma_xy = 0.01,
+    sigma_xy = 1,
     sigma_psi = np.deg2rad(1),
-    sigma_range = 0.1,
-    sigma_bearing = np.deg2rad(1),
-    alpha_individual = 0.05,
-    alpha_joint = 0.05,
+    sigma_range = 0.5,
+    sigma_bearing = np.deg2rad(5),
+    alpha_individual = 1e-5,
+    alpha_joint = 1e-5,
 )
 p = parameters
 
@@ -111,7 +111,7 @@ landmarks = simSLAM_ws["landmarks"].T
 odometry = simSLAM_ws["odometry"].T
 poseGT = simSLAM_ws["poseGT"].T
 
-K = len(z)
+K = len(z) 
 M = len(landmarks)
 
 # %% Initilize
@@ -150,12 +150,13 @@ P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
 # plotting
 
 doAssoPlot = False
-playMovie = False
+playMovie = True
+saveMovie = False
 if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = K
+N = 200
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -202,7 +203,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
 print("sim complete")
 
 pose_est = np.array([x[:3] for x in eta_hat[:N]])
-lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat]
+lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat[:N]]
 lmk_est_final = lmk_est[N - 1]
 
 np.set_printoptions(precision=4, linewidth=100)
@@ -331,7 +332,16 @@ if playMovie:
 
             camera.snap()
         animation = camera.animate(interval=100, blit=True, repeat=False)
+        if saveMovie:
+            animation.save(
+                    FIG_DIR+"/animation.mp4",
+                    dpi=400,
+                    savefig_kwargs={
+                        "pad_inches": "tight",
+                    },
+            )
         print("playing movie")
+
 
     except ImportError:
         print(

@@ -1,6 +1,6 @@
-;\sigma_\text{xy};0.01
-;\sigma_r;0.1
-;\alpha_\text{individual};0.05
-;\alpha_\text{joint};0.05
-;\sigma_\theta;1.0 \text{deg}
+;\sigma_\text{xy};1
+;\sigma_r;0.5
+;\alpha_\text{individual};1e-05
+;\alpha_\text{joint};1e-05
+;\sigma_\theta;5.0 \text{deg}
 ;\sigma_\psi;1.0 \text{deg}

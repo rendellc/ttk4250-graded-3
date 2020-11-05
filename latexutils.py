@@ -84,4 +84,6 @@ def save_value(name, value, filename):
         writer = csv.writer(csvfile, delimiter=';',quoting=csv.QUOTE_MINIMAL)
         writer.writerow([name, value])
 
+def savefig(fig, name):
+    fig.savefig(name+".pdf")
 
