@@ -11,6 +11,10 @@ from scipy.stats import chi2
 import utils
 
 import latexutils
+import plotutils as plot
+
+from sys import flags
+interactive_mode = flags.interactive
 
 
 try:
@@ -79,16 +83,22 @@ except Exception as e:
 from EKFSLAM import EKFSLAM
 from plotting import ellipse
 
-FIG_DIR = "figs/"
+FIG_DIR = "sim_results/"
 parameters = dict(
-    sigma_xy = 0.1,
+    sigma_x = 0.05,
+    sigma_y = 0.01,
     sigma_psi = np.deg2rad(1),
     sigma_range = 1,
-    sigma_bearing = np.deg2rad(5),
+    sigma_bearing = np.deg2rad(2.5),
     alpha_individual = 0.05,
     alpha_joint = 0.05,
+    alpha_consistency = 0.05,
 )
 p = parameters
+doAsso = True
+doAssoPlot = False
+playMovie = False
+saveMovie = False
 
 latexutils.save_params_to_csv(
     latexutils.parameter_to_texvalues(parameters),
@@ -98,33 +108,22 @@ latexutils.save_params_to_csv(
 # %% Load data
 simSLAM_ws = loadmat("simulatedSLAM")
 
-## NB: this is a MATLAB cell, so needs to "double index" to get out the measurements of a time step k:
-#
-# ex:
-#
-# z_k = z[k][0] # z_k is a (2, m_k) matrix with columns equal to the measurements of time step k
-#
-##
 z = [zk.T for zk in simSLAM_ws["z"].ravel()]
-
 landmarks = simSLAM_ws["landmarks"].T
 odometry = simSLAM_ws["odometry"].T
 poseGT = simSLAM_ws["poseGT"].T
+
+
 
 K = len(z) 
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([p["sigma_xy"],p["sigma_xy"],p["sigma_psi"]])**2
+Q = np.diag([p["sigma_x"],p["sigma_y"],p["sigma_psi"]])**2
 R = np.diag([p["sigma_range"],p["sigma_bearing"]])**2
 
-doAsso = True
 
 JCBBalphas = np.array([p["alpha_joint"], p["alpha_individual"]])
-# first is for joint compatibility, second is individual
-# these can have a large effect on runtime either through the number of landmarks created
-# or by the size of the association search space.
-
 slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
 
 # allocate
@@ -140,7 +139,8 @@ CInorm = np.zeros((K, 2))
 NEESes = np.zeros((K, 3))
 
 # For consistency testing
-alpha = 0.05
+alpha = p["alpha_consistency"]
+confprob = 1 - alpha
 
 # init
 eta_pred[0] = poseGT[0]  # we start at the correct position for reference
@@ -149,14 +149,12 @@ P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
 # %% Set up plotting
 # plotting
 
-doAssoPlot = False
-playMovie = True
-saveMovie = False
 if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
 N = K
+t = np.arange(N)
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -173,7 +171,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
 
     num_asso = np.count_nonzero(a[k] > -1)
 
-    CI[k] = chi2.interval(alpha, 2 * num_asso)
+    CI[k] = chi2.interval(confprob, 2 * num_asso)
 
     if num_asso > 0:
         NISnorm[k] = NIS[k] / (2 * num_asso)
@@ -236,65 +234,109 @@ ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
 ax2.axis("equal")
 ax2.grid()
 
-latexutils.savefig(fig2, FIG_DIR + "trajectory")
+latexutils.save_fig(fig2, FIG_DIR + "trajectory")
 
 # %% Consistency
+CI1 = chi2.interval(confprob, 1)
+CI2 = chi2.interval(confprob, 2)
+CI3 = chi2.interval(confprob, 3)
+CI1N = np.array(chi2.interval(confprob, 1*N)) / N
+CI2N = np.array(chi2.interval(confprob, 2*N)) / N
+CI3N = np.array(chi2.interval(confprob, 3*N)) / N
 
-# NIS
+NEESpose, NEESpos, NEESpsi = NEESes.T
+insideCIpose = (CI3[0] <= NEESpose) * (NEESpose <= CI3[1])
+insideCIpos = (CI2[0] <= NEESpos) * (NEESpos <= CI2[1])
+insideCIpsi = (CI1[0] <= NEESpsi) * (NEESpsi <= CI1[1])
+ANEESpose = NEESpose.mean()
+ANEESpos = NEESpos.mean()
+ANEESpsi = NEESpsi.mean()
+
 insideCI = (CInorm[:N,0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N,1])
 
+consistencydatas = [
+        dict(avg=ANEESpose,inside=insideCIpose.mean(), text="NEES pose",CI=CI3N),
+        dict(avg=ANEESpos,inside=insideCIpos.mean(), text="NEES pos",CI=CI2N),
+        dict(avg=ANEESpsi,inside=insideCIpsi.mean(), text="NEES psi",CI=CI1N),
+        dict(inside=insideCI.mean(), text="NIS"),
+]
+
+latexutils.save_consistency_results(consistencydatas, "sim_results/consistency.csv")
+
+print("ANEESes")
+print(f"\tpose\t{ANEESpose}\t{CI3N}")
+print(f"\tpos\t{ANEESpos}\t{CI2N}")
+print(f"\tpsi\t{ANEESpsi}\t{CI1N}")
+print(f"NIS: {insideCI.mean():.1%} inside")
+
+
+# NIS
+
 fig3, ax3 = plt.subplots(num=3, clear=True)
-ax3.plot(CInorm[:N,0], '--')
-ax3.plot(CInorm[:N,1], '--')
-ax3.plot(NISnorm[:N], lw=0.5)
+nis_str = f"NIS ({insideCI.mean():.1%} inside)"
+plot.pretty_NEESNIS(ax3, t, NISnorm[:N], nis_str, CInorm[:N,0], CInorm[:N,1])
+ax3.legend(loc="upper right")
+#ax3.set_title(f'NIS, {insideCI.mean():.0%} inside CI')
 
-ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
-
-latexutils.savefig(fig3, FIG_DIR + "NIS")
+latexutils.save_fig(fig3, FIG_DIR + "NIS")
 
 # NEES
 
 fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(7, 5), num=4, clear=True, sharex=True)
+pose_str = f"NEES pose ({insideCIpose.mean():.1%} inside)"
+plot.pretty_NEESNIS(ax4[0], t, NEESpose, pose_str, CI3[0], CI3[1])
+pos_str = f"NEES pos ({insideCIpos.mean():.1%} inside)"
+plot.pretty_NEESNIS(ax4[1], t, NEESpos, pos_str, CI2[0], CI2[1])
+psi_str = f"NEES heading ({insideCIpsi.mean():.1%} inside)"
+plot.pretty_NEESNIS(ax4[2], t, NEESpsi, psi_str, CI1[0], CI1[1])
+
+for ax in ax4:
+    ax.legend(loc="upper right")
+
 tags = ['all', 'pos', 'heading']
 dfs = [3, 2, 1]
-
-for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
-    CI_NEES = chi2.interval(alpha, df)
-    ax.plot(np.full(N, CI_NEES[0]), '--')
-    ax.plot(np.full(N, CI_NEES[1]), '--')
-    ax.plot(NEES[:N], lw=0.5)
-    insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-    ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
-
-    CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
-    print(f"CI ANEES {tag}: {CI_ANEES}")
-    print(f"ANEES {tag}: {NEES.mean()}")
+#
+#for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
+#    ax.plot(np.full(N, CI_NEES[0]), '--')
+#    ax.plot(np.full(N, CI_NEES[1]), '--')
+#    ax.plot(NEES[:N], lw=0.5)
+#    insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
+#    ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
+#
+#    CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
+#    print(f"CI ANEES {tag}: {CI_ANEES}")
+#    print(f"ANEES {tag}: {NEES.mean()}")
 
 fig4.tight_layout()
 
-latexutils.savefig(fig4, FIG_DIR + "NEES")
+latexutils.save_fig(fig4, FIG_DIR + "NEES")
 
 # %% RMSE
-
-ylabels = ['m', 'deg']
-scalings = np.array([1, 180/np.pi])
-
-fig5, ax5 = plt.subplots(nrows=2, ncols=1, figsize=(7, 5), num=5, clear=True, sharex=True)
-
 pos_err = np.linalg.norm(pose_est[:N,:2] - poseGT[:N,:2], axis=1)
-heading_err = np.abs(utils.wrapToPi(pose_est[:N,2] - poseGT[:N,2]))
+heading_err = np.rad2deg(np.abs(utils.wrapToPi(pose_est[:N,2] - poseGT[:N,2])))
+pos_rmse = np.sqrt((pos_err**2).mean())
+heading_rmse = np.sqrt((heading_err**2).mean())
 
-errs = np.vstack((pos_err, heading_err))
+fig5, ax5 = plt.subplots(nrows=2, ncols=1, num=5, clear=True, sharex=True)
 
-for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
-    ax.plot(err*scaling)
-    ax.set_title(f"{tag}: RMSE {np.sqrt((err**2).mean())*scaling} {ylabel}")
-    ax.set_ylabel(f"[{ylabel}]")
-    ax.grid()
+ax5[0].plot(t,pos_err, label="Position error")
+#ax5[0].plot([t[0],t[~0]], [pos_rmse]*2, label="Position RMSE")
+ax5[0].set_ylabel("[m]")
+#ax5[0].set_title(f"pos: RMSE {} [m]")
+ax5[1].plot(t,heading_err, label="Heading error")
+#ax5[1].plot([t[0],t[~0]], [heading_rmse]*2, label="Heading RMSE")
+ax5[1].set_ylabel("[deg]")
+#ax5[1].set_title(f"heading: RMSE {np.sqrt((heading_err**2).mean()):.4f} [deg]")
+
+for ax in ax5:
+    ax.set_xlim(t[0], t[~0])
+    ax.set_ylim(bottom=0)
+    ax.legend(loc="upper right")
+    ax.grid(True)
 
 fig5.tight_layout()
 
-latexutils.savefig(fig5, FIG_DIR + "RMSE")
+latexutils.save_fig(fig5, FIG_DIR + "RMSE")
 
 # %% Movie time
 
@@ -340,7 +382,6 @@ if playMovie:
                         "pad_inches": "tight",
                     },
             )
-        print("playing movie")
 
 
     except ImportError:
@@ -349,6 +390,8 @@ if playMovie:
         )
 
 
+if interactive_mode:
+    plt.show(block=False)
 
-plt.show()
+
 # %%

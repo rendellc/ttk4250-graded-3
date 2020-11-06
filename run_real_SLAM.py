@@ -2,6 +2,9 @@
 from scipy.io import loadmat
 from scipy.stats import chi2
 
+from sys import flags
+interactive_mode = flags.interactive
+
 try:
     from tqdm import tqdm
 except ImportError as e:
@@ -22,6 +25,7 @@ from plotting import ellipse
 from vp_utils import detectTrees, odometry, Car
 from utils import rotmat2d
 
+import latexutils
 import plotutils as plot
 
 
@@ -109,16 +113,30 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = np.array([0.01,0.01,np.deg2rad(0.1)])
+FIG_DIR = "real_results/"
+parameters = dict(
+    sigma_x = 0.1,
+    sigma_y = 0.1,
+    sigma_psi = np.deg2rad(1),
+    sigma_range = 1,
+    sigma_bearing = np.deg2rad(2.5),
+    alpha_individual = 0.0001,
+    alpha_joint = 0.0001,
+    alpha_consistency = 0.05,
+)
+p = parameters
+
+
+sigmas = [p["sigma_x"],p["sigma_y"],p["sigma_psi"]]
 CorrCoeff = np.array([
     [1, 0, 0], 
     [0, 1, 0.9], 
     [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
-R = np.diag([4,np.deg2rad(2)])**2
+R = np.diag([p["sigma_range"],p["sigma_bearing"]])**2
 
-JCBBalphas = np.array([0.001, 0.001])
+JCBBalphas = np.array([p["alpha_joint"], p["alpha_individual"]])
 
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
@@ -126,19 +144,23 @@ doAsso = True
 slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffset)
 
 # For consistency testing
-alpha = 0.05
-confidence_prob = 1 - alpha
+alpha = p["alpha_consistency"]
+confprob = 1 - alpha
 
 xupd = np.zeros((mK, 3))
 a = [None] * mK
 NIS = np.zeros(mK)
 NISnorm = np.zeros(mK)
 CI = np.zeros((mK, 2))
-CI1 = np.array(chi2.interval(confidence_prob, 1))
-CI2 = np.array(chi2.interval(confidence_prob, 2))
+CI1 = np.array(chi2.interval(confprob, 1))
+CI2 = np.array(chi2.interval(confprob, 2))
 CInorm = np.zeros((mK, 2))
 P_pose = np.zeros((K,3,3))
 N_lmk = np.zeros(K)
+GPSerror = np.zeros(mK)
+NISxraw = np.zeros(mK)
+NISyraw = np.zeros(mK)
+NISxyraw = np.zeros(mK)
 NISx = np.zeros(mK)
 NISy = np.zeros(mK)
 NISxy = np.zeros(mK)
@@ -176,6 +198,10 @@ if doPlot:
     sh_lmk = ax.scatter(np.nan, np.nan, c="r", marker="x")
     sh_Z = ax.scatter(np.nan, np.nan, c="b", marker=".")
 
+    figGps, axGps = plt.subplots()
+    lineGpsError, = axGps.plot([],[],label="GPS error")
+    axGps.legend()
+
 do_raw_prediction = True
 Rgps = np.diag([1,1])
 if do_raw_prediction:  # TODO: further processing such as plotting
@@ -192,9 +218,9 @@ if do_raw_prediction:  # TODO: further processing such as plotting
         if gpsk < Kgps and k < K - 1 and timeGps[gpsk] <= timeOdo[k+1]:
             v = odox[k,:2] - np.array([Lo_m[gpsk], La_m[gpsk]])
             S = Pc[:2,:2] + Rgps
-            NISx[gpsk] = v[0]**2 / S[0,0]
-            NISy[gpsk] = v[1]**2 / S[1,1]
-            NISxy[gpsk] = v.T @ np.linalg.solve(S, v)
+            NISxraw[gpsk] = v[0]**2 / S[0,0]
+            NISyraw[gpsk] = v[1]**2 / S[1,1]
+            NISxyraw[gpsk] = v.T @ np.linalg.solve(S, v)
             gpsk += 1
 
 # %%
@@ -221,16 +247,24 @@ for k in tqdm(range(N)):
         z = detectTrees(LASER[mk])
         eta, P, NIS[mk], a[mk] = slam.update(eta, P, z)
 
-        if timeGps[gpsk] <= timeOdo[k+1]:
-            gps_error = np.linalg.norm(
-                eta[:2] - np.array([Lo_m[gpsk], La_m[gpsk]])
-            )
 
-            if gps_error > 25:
-                abort = True
+        if timeGps[gpsk] <= timeOdo[k+1]:
+            # Compute decompose NIS with GPS
+            v = eta[:2] - np.array([Lo_m[gpsk], La_m[gpsk]])
+            S = P[:2,:2] + Rgps
+            NISx[gpsk] = v[0]**2 / S[0,0]
+            NISy[gpsk] = v[1]**2 / S[1,1]
+            NISxy[gpsk] = v.T @ np.linalg.solve(S, v)
+
+            GPSerror[gpsk] = np.linalg.norm(v)
+
+            lineGpsError.set_data(timeGps[:gpsk+1], GPSerror[:gpsk+1])
+            axGps.relim()
+            axGps.autoscale_view()
+
+            if GPSerror[gpsk] > 25:
                 print("gps error large, aborting")
-                N = k
-                break
+                abort = True
 
             gpsk += 1
         
@@ -239,7 +273,7 @@ for k in tqdm(range(N)):
 
         if num_asso > 0:
             NISnorm[mk] = NIS[mk] / (2 * num_asso)
-            CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
+            CInorm[mk] = np.array(chi2.interval(confprob, 2 * num_asso)) / (
                 2 * num_asso
             )
         else:
@@ -267,13 +301,12 @@ for k in tqdm(range(N)):
                 ylim=[-200, 200],
                 title=f"step {k}, laser scan {mk}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}",
             )
+
+            fig.canvas.draw()
+            figGps.canvas.draw()
+
             #plt.draw()
             plt.pause(0.00001)
-
-            if abort:
-                print("aborting")
-                N = k
-                break
 
         mk += 1
 
@@ -283,17 +316,29 @@ for k in tqdm(range(N)):
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
         eta, P = slam.predict(eta, P, odo)
 
+    if abort:
+        print("aborting")
+        N = k
+        break
+
+
 # %% Consistency
 
 # NIS
 insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
+insideCIxy = (CI2[0] <= NISxy[:gpsk]) * (NISxy[:gpsk] <= CI2[1])
+insideCIx = (CI1[0] <= NISx[:gpsk]) * (NISx[:gpsk] <= CI1[1])
+insideCIy = (CI1[0] <= NISy[:gpsk]) * (NISy[:gpsk] <= CI1[1])
+insideCIxyraw = (CI2[0] <= NISxyraw[:gpsk]) * (NISxyraw[:gpsk] <= CI2[1])
+insideCIxraw = (CI1[0] <= NISxraw[:gpsk]) * (NISxraw[:gpsk] <= CI1[1])
+insideCIyraw = (CI1[0] <= NISyraw[:gpsk]) * (NISyraw[:gpsk] <= CI1[1])
 
 fig3, ax3 = plt.subplots(num=3, clear=True)
-ax3.plot(CInorm[:mk, 0], "--")
-ax3.plot(CInorm[:mk, 1], "--")
-ax3.plot(NISnorm[:mk], lw=0.5)
+nis_str = f"NIS ({insideCI.mean():.1%} inside)"
+plot.pretty_NEESNIS(ax3, timeLsr[:mk], NISnorm[:mk], nis_str, CInorm[:mk,0], CInorm[:mk,1])
+ax3.legend()
+latexutils.save_fig(fig3, FIG_DIR + "NIS")
 
-ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI {1-alpha:.1%} ")
 
 # %% slam
 
@@ -310,19 +355,23 @@ if do_raw_prediction:
     ax5.grid()
     ax5.set_title("GPS vs odometry integration")
     ax5.legend()
+    latexutils.save_fig(fig5, FIG_DIR + "GPSvsOdom")
 
-    insideCIxy = (CI2[0] <= NISxy[:gpsk]) * (NISxy[:gpsk] <= CI2[1])
     fig9, ax9 = plt.subplots(2, 1, num=9, clear=True)
-    plot.pretty_NEESNIS(ax9[0], timeGps[:gpsk], NISxy[:gpsk], "NIS xy", CI2, True, 3*CI2[1])
-    plot.pretty_NEESNIS(ax9[1], timeGps[:gpsk], NISx[:gpsk], "NIS x", CI1, True, 3*CI1[1])
-    plot.pretty_NEESNIS(ax9[1], timeGps[:gpsk], NISy[:gpsk], "NIS y", CI1, True, 3*CI1[1])
+
+    xy_str = f"NIS xy ({insideCIxyraw.mean():.1%} inside)"
+    x_str = f"NIS x ({insideCIxraw.mean():.1%} inside)"
+    y_str = f"NIS y ({insideCIyraw.mean():.1%} inside)"
+    plot.pretty_NEESNIS(ax9[0], timeGps[:gpsk], NISxyraw[:gpsk], xy_str, CI2[0], CI2[1])
+    plot.pretty_NEESNIS(ax9[1], timeGps[:gpsk], NISxraw[:gpsk], x_str, CI1[0], CI1[1])
+    plot.pretty_NEESNIS(ax9[1], timeGps[:gpsk], NISyraw[:gpsk], y_str, CI1[0], CI1[1])
 
     for ax in ax9:
         #ax.set_xlim([timeOdo[0], timeOdo[N-1]])
         ax.legend()
-    
-    ax9[0].set_title(f"NIS xy, {insideCIxy.mean()*100:.2f}% inside CI {1-alpha:.1%} ")
+    fig9.tight_layout()
 
+    latexutils.save_fig(fig9, FIG_DIR + "NISraw")
 
     fig10, ax10s = plt.subplots(3, 1, sharex=True, num=10, clear=True)
     ax10s[0].plot(timeOdo[:N], odos[:N,0], label=r"odom $x$")
@@ -331,6 +380,8 @@ if do_raw_prediction:
     ax10s[0].legend()
     ax10s[1].legend()
     ax10s[2].legend()
+
+    latexutils.save_fig(fig10, FIG_DIR + "odom")
     
 
 
@@ -341,24 +392,45 @@ ax6.plot(*xupd[mk_first:mk, :2].T)
 ax6.set(
     title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
 )
+latexutils.save_fig(fig6, FIG_DIR + "finalupdate")
 
 # %%
 fig7, ax7 = plt.subplots(num=7, clear=True)
 P_norm = np.linalg.norm(P_pose[:mk], axis=(1,2))
-ax7.plot(P_norm)
+ax7.plot(timeLsr[:mk], P_norm)
 ax7.set_title("P pose norm")
+latexutils.save_fig(fig7, FIG_DIR + "pose_covariance")
 
 fig8, ax8 = plt.subplots(num=8, clear=True)
-ax8.plot(N_lmk[:N])
+ax8.plot(timeOdo[:N], N_lmk[:N])
 ax8.set_title("Number of landmarks over time")
+latexutils.save_fig(fig8, FIG_DIR + "num_landmarks")
 
 fig11, ax11 = plt.subplots(num=11, clear=True)
 ax11.plot(timeLsr[:mk], np.rad2deg(xupd[:mk,2]))
 ax11.set_title("Heading estimate (deg)")
+latexutils.save_fig(fig11, FIG_DIR + "heading_estimate")
 
 
+fig12, ax12 = plt.subplots(2, 1, num=12, clear=True)
+
+xy_str = f"NIS xy ({insideCIxy.mean():.1%} inside)"
+x_str = f"NIS x ({insideCIx.mean():.1%} inside)"
+y_str = f"NIS y ({insideCIy.mean():.1%} inside)"
+plot.pretty_NEESNIS(ax12[0], timeGps[:gpsk], NISxy[:gpsk], xy_str, CI2[0], CI2[1])
+plot.pretty_NEESNIS(ax12[1], timeGps[:gpsk], NISx[:gpsk], x_str, CI1[0], CI1[1])
+plot.pretty_NEESNIS(ax12[1], timeGps[:gpsk], NISy[:gpsk], y_str, CI1[0], CI1[1])
+
+for ax in ax12:
+    ax.legend()
+fig12.tight_layout()
+
+latexutils.save_fig(fig12, FIG_DIR + "NISxy")
 
 
-plt.show()
+if interactive_mode:
+    plt.show(block=False)
+
+
 
 # %%

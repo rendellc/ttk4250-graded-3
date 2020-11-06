@@ -2,7 +2,8 @@ import csv
 from numpy import pi, rad2deg
 
 PARAMETER_TO_TEXNAME = dict(
-    sigma_xy = r"\sigma_\text{xy}",
+    sigma_x = r"\sigma_\text{x}",
+    sigma_y = r"\sigma_\text{y}",
     sigma_range = r"\sigma_r",
     alpha_joint = r"\alpha_\text{joint}",
     alpha_individual = r"\alpha_\text{individual}",
@@ -54,7 +55,7 @@ def save_params_to_csv(params, filename, headers=[]):
 def save_consistency_results(consdatas, filename):
     # consdatas : [{avg, inside, text, CI}]
 
-    round_str = lambda num: round(num,3)
+    round_str = lambda num: f"{num:.3f}"
     percent_str = lambda num: rf"{(100*num):.1f}\%"
 
     with open(filename, 'w', newline='') as csvfile:
@@ -63,10 +64,15 @@ def save_consistency_results(consdatas, filename):
 
         # write so that latex will interpret it correctly
         # cant start a line with backslash so first column is empty
+        # % must be escaped
 
         #writer.writerow(["", "", "Inside", "Averaged", "CI"])
         for consdata in consdatas:
-            avg = round_str(consdata["avg"])
+            if "avg" in consdata:
+                avg = round_str(consdata["avg"])
+            else:
+                avg = ""
+
             inside = percent_str(consdata["inside"])
             text = consdata["text"]
 
@@ -74,7 +80,7 @@ def save_consistency_results(consdatas, filename):
             if len(CI) > 0:
                 CItext = f"({round_str(CI[0])},{round_str(CI[1])})"
             else:
-                CItext = "-"
+                CItext = ""
 
             writer.writerow(["", text, inside, avg, CItext])
 
@@ -84,6 +90,6 @@ def save_value(name, value, filename):
         writer = csv.writer(csvfile, delimiter=';',quoting=csv.QUOTE_MINIMAL)
         writer.writerow([name, value])
 
-def savefig(fig, name):
+def save_fig(fig, name):
     fig.savefig(name+".pdf")
 
