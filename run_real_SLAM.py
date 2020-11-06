@@ -359,6 +359,6 @@ ax11.set_title("Heading estimate (deg)")
 
 
 
-plt.show(block=False)
+plt.show()
 
 # %%

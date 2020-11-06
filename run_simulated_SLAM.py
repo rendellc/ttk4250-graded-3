@@ -81,12 +81,12 @@ from plotting import ellipse
 
 FIG_DIR = "figs/"
 parameters = dict(
-    sigma_xy = 1,
+    sigma_xy = 0.1,
     sigma_psi = np.deg2rad(1),
-    sigma_range = 0.5,
+    sigma_range = 1,
     sigma_bearing = np.deg2rad(5),
-    alpha_individual = 1e-5,
-    alpha_joint = 1e-5,
+    alpha_individual = 0.05,
+    alpha_joint = 0.05,
 )
 p = parameters
 
@@ -156,7 +156,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 200
+N = K
 
 print("starting sim (" + str(N) + " iterations)")
 

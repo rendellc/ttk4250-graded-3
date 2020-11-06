@@ -140,7 +140,7 @@ class EKFSLAM:
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + Fu @ self.Q @ Fu.T
+        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + self.Q
         P[:3, 3:] = Fx @ P[:3,3:]
         P[3:, :3] = P[:3,3:].T
 
@@ -224,12 +224,13 @@ class EKFSLAM:
 
         delta_m = (m.T - x[:2]).T
 
-        zc = delta_m - Rot @ self.sensor_offset.reshape((2,1))
+        zc = delta_m - (Rot @ self.sensor_offset).reshape((2,1))
         # (2, #measurements), each measured position in cartesian coordinates like
         # [x coordinates;
         #  y coordinates]
 
         zpred = self.h(eta).reshape((-1,2)).T
+
         # (2, #measurements), predicted measurements, like
         # [ranges;
         #  bearings]
@@ -261,7 +262,7 @@ class EKFSLAM:
 
             Hm[inds,inds] = np.vstack([
                 zc_unit.T,
-                zc_unit.T/zc_norm @ Rpihalf
+                zc_unit.T/zc_norm @ Rpihalf.T
             ])
 
 
@@ -316,8 +317,7 @@ class EKFSLAM:
             # TODO, calculate position of new landmark in world frame
 
             Gx[inds, :2] = I2
-            Gx[inds, 2] = zr * np.array([-np.sin(zb+x[2]), np.cos(zb+x[2])]) \
-                + sensor_offset_world_der
+            Gx[inds, 2] = zr * np.array([-np.sin(zb+x[2]), np.cos(zb+x[2])]) + sensor_offset_world_der
 
             Gz = rot @ np.diag([1,zr])
 
@@ -459,6 +459,8 @@ class EKFSLAM:
                 # S.T @ W.T = (P @ H.T).T
                 # A x = b => x = A^-1 b
                 W = la.cho_solve(S_cho_factors, (P @ Ha.T).T).T
+                #Sa_inv = la.inv(Sa)
+                #W = P @ Ha.T @ Sa_inv
                 etaupd = eta + W @ v
 
                 # Kalman cov update: use Joseph form for stability
@@ -470,6 +472,7 @@ class EKFSLAM:
 
                 # calculate NIS, can use S_cho_factors
                 NIS = v.T @ la.cho_solve(S_cho_factors, v)
+                #NIS = v.T @ Sa_inv @ v
 
                 # When tested, remove for speed
                 assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"
