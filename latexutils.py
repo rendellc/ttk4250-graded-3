@@ -1,6 +1,8 @@
 import csv
 from numpy import pi, rad2deg
 
+from pathlib import Path
+
 PARAMETER_TO_TEXNAME = dict(
     sigma_x = r"\sigma_\text{x}",
     sigma_y = r"\sigma_\text{y}",
@@ -8,6 +10,19 @@ PARAMETER_TO_TEXNAME = dict(
     alpha_joint = r"\alpha_\text{joint}",
     alpha_individual = r"\alpha_\text{individual}",
 )
+
+SAVE_DIR = Path(".")
+
+def set_save_dir(dirname):
+    """
+    Set the default save directory for module.
+    """
+    global SAVE_DIR
+    SAVE_DIR = Path(dirname)
+
+    if not SAVE_DIR.exists():
+        print("Creating", SAVE_DIR)
+        SAVE_DIR.mkdir()
 
 def sig_exp(num_str):
     parts = num_str.split('.', 2)
@@ -39,8 +54,9 @@ def parameter_to_texvalues(params):
 
 def save_params_to_csv(params, filename, headers=[]):
     #texparameters = parameter_to_texvalues(params)
+    p = SAVE_DIR / filename
 
-    with open(filename, 'w', newline='') as csvfile:
+    with p.open(mode='w', newline='') as csvfile:
         print("Writing parameters to", csvfile.name)
         writer = csv.writer(csvfile, delimiter=';',quoting=csv.QUOTE_MINIMAL)
 
@@ -54,11 +70,12 @@ def save_params_to_csv(params, filename, headers=[]):
 
 def save_consistency_results(consdatas, filename):
     # consdatas : [{avg, inside, text, CI}]
+    p = SAVE_DIR / filename
 
     round_str = lambda num: f"{num:.3f}"
     percent_str = lambda num: rf"{(100*num):.1f}\%"
 
-    with open(filename, 'w', newline='') as csvfile:
+    with p.open(mode='w', newline='') as csvfile:
         print("Writing consistency results to", csvfile.name)
         writer = csv.writer(csvfile, delimiter=';',quoting=csv.QUOTE_MINIMAL)
 
@@ -85,11 +102,13 @@ def save_consistency_results(consdatas, filename):
             writer.writerow(["", text, inside, avg, CItext])
 
 def save_value(name, value, filename):
-    with open(filename, 'w', newline='') as csvfile:
+    p = SAVE_DIR / filename
+    with p.open(mode='w', newline='') as csvfile:
         print(f"Saving {name} to", csvfile.name)
         writer = csv.writer(csvfile, delimiter=';',quoting=csv.QUOTE_MINIMAL)
         writer.writerow([name, value])
 
-def save_fig(fig, name):
-    fig.savefig(name+".pdf")
+def save_fig(fig, filename):
+    p = SAVE_DIR / filename
+    fig.savefig(p)
 

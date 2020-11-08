@@ -1,0 +1,7 @@
+;\sigma_\text{x};0.1
+;\sigma_\text{y};0.1
+;\sigma_r;1
+;\alpha_\text{individual};0.0001
+;\alpha_\text{joint};0.0001
+;\sigma_\theta;2.5 \text{deg}
+;\sigma_\psi;1.0 \text{deg}

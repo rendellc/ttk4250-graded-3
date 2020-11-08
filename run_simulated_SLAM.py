@@ -83,7 +83,7 @@ except Exception as e:
 from EKFSLAM import EKFSLAM
 from plotting import ellipse
 
-FIG_DIR = "sim_results/"
+latexutils.set_save_dir("sim_results")
 parameters = dict(
     sigma_x = 0.05,
     sigma_y = 0.01,
@@ -102,7 +102,7 @@ saveMovie = False
 
 latexutils.save_params_to_csv(
     latexutils.parameter_to_texvalues(parameters),
-    FIG_DIR + "parameters.csv")
+    "parameters.csv")
 
 
 # %% Load data
@@ -234,7 +234,7 @@ ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
 ax2.axis("equal")
 ax2.grid()
 
-latexutils.save_fig(fig2, FIG_DIR + "trajectory")
+latexutils.save_fig(fig2, "trajectory.pdf")
 
 # %% Consistency
 CI1 = chi2.interval(confprob, 1)
@@ -261,7 +261,7 @@ consistencydatas = [
         dict(inside=insideCI.mean(), text="NIS"),
 ]
 
-latexutils.save_consistency_results(consistencydatas, "sim_results/consistency.csv")
+latexutils.save_consistency_results(consistencydatas, "consistency.csv")
 
 print("ANEESes")
 print(f"\tpose\t{ANEESpose}\t{CI3N}")
@@ -278,7 +278,7 @@ plot.pretty_NEESNIS(ax3, t, NISnorm[:N], nis_str, CInorm[:N,0], CInorm[:N,1])
 ax3.legend(loc="upper right")
 #ax3.set_title(f'NIS, {insideCI.mean():.0%} inside CI')
 
-latexutils.save_fig(fig3, FIG_DIR + "NIS")
+latexutils.save_fig(fig3, "NIS.pdf")
 
 # NEES
 
@@ -309,7 +309,7 @@ dfs = [3, 2, 1]
 
 fig4.tight_layout()
 
-latexutils.save_fig(fig4, FIG_DIR + "NEES")
+latexutils.save_fig(fig4, "NEES.pdf")
 
 # %% RMSE
 pos_err = np.linalg.norm(pose_est[:N,:2] - poseGT[:N,:2], axis=1)
@@ -336,7 +336,7 @@ for ax in ax5:
 
 fig5.tight_layout()
 
-latexutils.save_fig(fig5, FIG_DIR + "RMSE")
+latexutils.save_fig(fig5, "RMSE.pdf")
 
 # %% Movie time
 
@@ -376,7 +376,7 @@ if playMovie:
         animation = camera.animate(interval=100, blit=True, repeat=False)
         if saveMovie:
             animation.save(
-                    FIG_DIR+"/animation.mp4",
+                    latexutils.SAVE_DIR / "animation.mp4",
                     dpi=400,
                     savefig_kwargs={
                         "pad_inches": "tight",

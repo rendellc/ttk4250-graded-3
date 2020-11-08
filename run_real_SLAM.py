@@ -29,6 +29,7 @@ import latexutils
 import plotutils as plot
 
 
+
 # %% plot config check and style setup
 
 
@@ -113,7 +114,8 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-FIG_DIR = "real_results/"
+latexutils.set_save_dir("real_results")
+
 parameters = dict(
     sigma_x = 0.1,
     sigma_y = 0.1,
@@ -125,6 +127,10 @@ parameters = dict(
     alpha_consistency = 0.05,
 )
 p = parameters
+latexutils.save_params_to_csv(
+    latexutils.parameter_to_texvalues(parameters),
+    "parameters.csv")
+
 
 
 sigmas = [p["sigma_x"],p["sigma_y"],p["sigma_psi"]]
@@ -177,7 +183,7 @@ t = timeOdo[0]
 # %%  run
 N = 10000
 
-doPlot = True
+doPlot = False
 
 lh_pose = None
 
@@ -226,6 +232,7 @@ if do_raw_prediction:  # TODO: further processing such as plotting
 # %%
 
 gpsk = 0
+tNextPlotDraw, plotFps = 0, 0.1
 for k in tqdm(range(N)):
     P_pose[k] = P[:3,:3]
     N_lmk[k] = len(eta[3:])//2
@@ -257,10 +264,6 @@ for k in tqdm(range(N)):
             NISxy[gpsk] = v.T @ np.linalg.solve(S, v)
 
             GPSerror[gpsk] = np.linalg.norm(v)
-
-            lineGpsError.set_data(timeGps[:gpsk+1], GPSerror[:gpsk+1])
-            axGps.relim()
-            axGps.autoscale_view()
 
             if GPSerror[gpsk] > 25:
                 print("gps error large, aborting")
@@ -296,17 +299,23 @@ for k in tqdm(range(N)):
                 sh_Z.set_offsets(zinmap.T)
             lh_pose.set_data(*xupd[mk_first:mk, :2].T)
 
+            lineGpsError.set_data(timeGps[:gpsk+1], GPSerror[:gpsk+1])
+
             ax.set(
                 xlim=[-200, 200],
                 ylim=[-200, 200],
                 title=f"step {k}, laser scan {mk}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}",
             )
 
-            fig.canvas.draw()
-            figGps.canvas.draw()
+            if t > tNextPlotDraw:
+                axGps.relim()
+                axGps.autoscale_view()
 
-            #plt.draw()
-            plt.pause(0.00001)
+                fig.canvas.draw()
+                figGps.canvas.draw()
+
+                plt.pause(0.00001)
+                tNextPlotDraw += 1/plotFps
 
         mk += 1
 
@@ -337,7 +346,7 @@ fig3, ax3 = plt.subplots(num=3, clear=True)
 nis_str = f"NIS ({insideCI.mean():.1%} inside)"
 plot.pretty_NEESNIS(ax3, timeLsr[:mk], NISnorm[:mk], nis_str, CInorm[:mk,0], CInorm[:mk,1])
 ax3.legend()
-latexutils.save_fig(fig3, FIG_DIR + "NIS")
+latexutils.save_fig(fig3, "NIS.pdf")
 
 
 # %% slam
@@ -355,7 +364,7 @@ if do_raw_prediction:
     ax5.grid()
     ax5.set_title("GPS vs odometry integration")
     ax5.legend()
-    latexutils.save_fig(fig5, FIG_DIR + "GPSvsOdom")
+    latexutils.save_fig(fig5, "GPSvsOdom.pdf")
 
     fig9, ax9 = plt.subplots(2, 1, num=9, clear=True)
 
@@ -365,13 +374,14 @@ if do_raw_prediction:
     plot.pretty_NEESNIS(ax9[0], timeGps[:gpsk], NISxyraw[:gpsk], xy_str, CI2[0], CI2[1])
     plot.pretty_NEESNIS(ax9[1], timeGps[:gpsk], NISxraw[:gpsk], x_str, CI1[0], CI1[1])
     plot.pretty_NEESNIS(ax9[1], timeGps[:gpsk], NISyraw[:gpsk], y_str, CI1[0], CI1[1])
+    fig9.suptitle("NIS raw prediction")
 
     for ax in ax9:
         #ax.set_xlim([timeOdo[0], timeOdo[N-1]])
         ax.legend()
     fig9.tight_layout()
 
-    latexutils.save_fig(fig9, FIG_DIR + "NISraw")
+    latexutils.save_fig(fig9, "NISraw.pdf")
 
     fig10, ax10s = plt.subplots(3, 1, sharex=True, num=10, clear=True)
     ax10s[0].plot(timeOdo[:N], odos[:N,0], label=r"odom $x$")
@@ -381,7 +391,7 @@ if do_raw_prediction:
     ax10s[1].legend()
     ax10s[2].legend()
 
-    latexutils.save_fig(fig10, FIG_DIR + "odom")
+    latexutils.save_fig(fig10, "odom.pdf")
     
 
 
@@ -392,24 +402,24 @@ ax6.plot(*xupd[mk_first:mk, :2].T)
 ax6.set(
     title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
 )
-latexutils.save_fig(fig6, FIG_DIR + "finalupdate")
+latexutils.save_fig(fig6, "finalupdate.pdf")
 
 # %%
 fig7, ax7 = plt.subplots(num=7, clear=True)
 P_norm = np.linalg.norm(P_pose[:mk], axis=(1,2))
 ax7.plot(timeLsr[:mk], P_norm)
 ax7.set_title("P pose norm")
-latexutils.save_fig(fig7, FIG_DIR + "pose_covariance")
+latexutils.save_fig(fig7, "pose_covariance.pdf")
 
 fig8, ax8 = plt.subplots(num=8, clear=True)
 ax8.plot(timeOdo[:N], N_lmk[:N])
 ax8.set_title("Number of landmarks over time")
-latexutils.save_fig(fig8, FIG_DIR + "num_landmarks")
+latexutils.save_fig(fig8, "num_landmarks.pdf")
 
 fig11, ax11 = plt.subplots(num=11, clear=True)
 ax11.plot(timeLsr[:mk], np.rad2deg(xupd[:mk,2]))
 ax11.set_title("Heading estimate (deg)")
-latexutils.save_fig(fig11, FIG_DIR + "heading_estimate")
+latexutils.save_fig(fig11, "heading_estimate.pdf")
 
 
 fig12, ax12 = plt.subplots(2, 1, num=12, clear=True)
@@ -425,7 +435,7 @@ for ax in ax12:
     ax.legend()
 fig12.tight_layout()
 
-latexutils.save_fig(fig12, FIG_DIR + "NISxy")
+latexutils.save_fig(fig12, "NISxy.pdf")
 
 
 if interactive_mode:
