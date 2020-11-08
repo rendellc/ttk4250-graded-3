@@ -4,4 +4,4 @@
 ;\alpha_\text{individual};0.05
 ;\alpha_\text{joint};0.05
 ;\sigma_\theta;2.5 \text{deg}
-;\sigma_\psi;1.0 \text{deg}
+;\sigma_\psi;0.1 \text{deg}

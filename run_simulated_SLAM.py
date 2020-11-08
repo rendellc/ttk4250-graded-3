@@ -87,7 +87,7 @@ latexutils.set_save_dir("sim_results")
 parameters = dict(
     sigma_x = 0.05,
     sigma_y = 0.01,
-    sigma_psi = np.deg2rad(1),
+    sigma_psi = np.deg2rad(0.1),
     sigma_range = 1,
     sigma_bearing = np.deg2rad(2.5),
     alpha_individual = 0.05,
@@ -282,7 +282,7 @@ latexutils.save_fig(fig3, "NIS.pdf")
 
 # NEES
 
-fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(7, 5), num=4, clear=True, sharex=True)
+fig4, ax4 = plt.subplots(nrows=3, ncols=1, num=4, clear=True, sharex=True)
 pose_str = f"NEES pose ({insideCIpose.mean():.1%} inside)"
 plot.pretty_NEESNIS(ax4[0], t, NEESpose, pose_str, CI3[0], CI3[1])
 pos_str = f"NEES pos ({insideCIpos.mean():.1%} inside)"
@@ -295,17 +295,6 @@ for ax in ax4:
 
 tags = ['all', 'pos', 'heading']
 dfs = [3, 2, 1]
-#
-#for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
-#    ax.plot(np.full(N, CI_NEES[0]), '--')
-#    ax.plot(np.full(N, CI_NEES[1]), '--')
-#    ax.plot(NEES[:N], lw=0.5)
-#    insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-#    ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
-#
-#    CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
-#    print(f"CI ANEES {tag}: {CI_ANEES}")
-#    print(f"ANEES {tag}: {NEES.mean()}")
 
 fig4.tight_layout()
 
