@@ -270,5 +270,7 @@ def plot_NIS(NIS, CI, NIS_name, confprob, dt, N, GNSSk, ax=None):
     ax.set_xlim(0,(N-1)*dt)
     ax.set_ylim(0,upperY)
 
+def heatmap(ax, pos, weights, xlim, ylim, bins=25, cmin=None):
+    ax.hist2d(pos[:,0], pos[:,1], weights=weights, bins=bins, range=[xlim, ylim], cmin=cmin)
 
 

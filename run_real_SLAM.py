@@ -120,10 +120,10 @@ parameters = dict(
     sigma_x = 0.05,
     sigma_y = 0.05,
     sigma_psi = np.deg2rad(0.25),
-    sigma_range = 0.05,
-    sigma_bearing = np.deg2rad(0.1),
-    alpha_individual = 1e-5,
-    alpha_joint = 1e-5,
+    sigma_range = 0.5,
+    sigma_bearing = np.deg2rad(1),
+    alpha_individual = 1e-10,
+    alpha_joint = 1e-10,
     alpha_consistency = 0.05,
 )
 p = parameters
@@ -188,7 +188,7 @@ mk = mk_first
 t = timeOdo[0]
 
 # %%  run
-N = 10000
+N = K
 
 doPlot = False
 doExtraPlots = True
@@ -521,6 +521,21 @@ fig12.tight_layout()
 
 latexutils.save_fig(fig12, "NISxy.pdf")
 
+P_norms_inv = 1/np.array([np.linalg.norm(P) for P in P_pose])
+
+figCovmap, axCovmap = plt.subplots(1,1)
+plot.heatmap(axCovmap, xpred[:k,:2], P_norms_inv[:k], [-150,120], [-150,120], bins=15, cmin=1e-16)
+axCovmap.plot(xupd[:mk,0], xupd[:mk,1], label="estimated trajectory", c="r")
+axCovmap.set_title(r"$|P_{xx}|$")
+
+latexutils.save_fig(figCovmap, "pose_covariance_map.pdf")
+
+figGPSdistmap, axGPSdistmap = plt.subplots(1,1)
+plot.heatmap(axGPSdistmap, xupd[:mk,:2], GPSerror[:mk], [-150,120], [-150,120], bins=15, cmin=1e-16)
+axGPSdistmap.plot(xupd[:mk,0], xupd[:mk,1], label="estimated trajectory", c="r")
+axGPSdistmap.set_title("GPS distance")
+
+latexutils.save_fig(figGPSdistmap, "gps_error_map.pdf")
 
 if interactive_mode:
     plt.show(block=False)
