@@ -117,13 +117,13 @@ car = Car(L, H, a, b)
 latexutils.set_save_dir("real_results")
 
 parameters = dict(
-    sigma_x = 0.1,
-    sigma_y = 0.1,
-    sigma_psi = np.deg2rad(1),
-    sigma_range = 1,
-    sigma_bearing = np.deg2rad(2.5),
-    alpha_individual = 0.0001,
-    alpha_joint = 0.0001,
+    sigma_x = 0.01,
+    sigma_y = 0.01,
+    sigma_psi = np.deg2rad(0.1),
+    sigma_range = 0.05,
+    sigma_bearing = np.deg2rad(0.5),
+    alpha_individual = 0.001,
+    alpha_joint = 0.001,
     alpha_consistency = 0.05,
 )
 p = parameters
@@ -261,7 +261,7 @@ for k in tqdm(range(N)):
             S = P[:2,:2] + Rgps
             NISx[gpsk] = v[0]**2 / S[0,0]
             NISy[gpsk] = v[1]**2 / S[1,1]
-            NISxy[gpsk] = v.T @ np.linalg.solve(S, v)
+            NISxy[gpsk]     = v.T @ np.linalg.solve(S, v)
 
             GPSerror[gpsk] = np.linalg.norm(v)
 

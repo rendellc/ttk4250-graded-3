@@ -140,7 +140,7 @@ class EKFSLAM:
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + self.Q
+        P[:3, :3] = Fx @ P[:3,:3] @ Fx.T + Fu @ self.Q @ Fu.T
         P[:3, 3:] = Fx @ P[:3,3:]
         P[3:, :3] = P[:3,3:].T
 
