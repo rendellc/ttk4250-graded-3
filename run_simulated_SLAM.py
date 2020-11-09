@@ -85,13 +85,13 @@ from plotting import ellipse
 
 latexutils.set_save_dir("sim_results")
 parameters = dict(
-    sigma_x = 0.05,
-    sigma_y = 0.01,
-    sigma_psi = np.deg2rad(0.1),
-    sigma_range = 1,
-    sigma_bearing = np.deg2rad(2.5),
-    alpha_individual = 0.05,
-    alpha_joint = 0.05,
+    sigma_x = 0.025,
+    sigma_y = 0.02,
+    sigma_psi = np.deg2rad(0.37),
+    sigma_range = 0.06,
+    sigma_bearing = np.deg2rad(1.2),
+    alpha_individual = 1e-5,
+    alpha_joint = 1e-5,
     alpha_consistency = 0.05,
 )
 p = parameters
@@ -133,9 +133,15 @@ eta_hat: List[Optional[np.ndarray]] = [None] * K
 P_hat: List[Optional[np.ndarray]] = [None] * K
 a: List[Optional[np.ndarray]] = [None] * K
 NIS = np.zeros(K)
+NIS_range = np.zeros(K)
+NIS_bearing = np.zeros(K)
+NISnorm_range = np.zeros(K)
+NISnorm_bearing = np.zeros(K)
 NISnorm = np.zeros(K)
 CI = np.zeros((K, 2))
 CInorm = np.zeros((K, 2))
+CI_rangebearing = np.zeros((K, 2))
+CInorm_rangebearing = np.zeros((K, 2))
 NEESes = np.zeros((K, 3))
 
 # For consistency testing
@@ -150,7 +156,7 @@ P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
 # plotting
 
 if doAssoPlot:
-    figAsso, axAsso = plt.subplots(num=1, clear=True)
+    figAsso, axAsso = plt.subplots( clear=True)
 
 # %% Run simulation
 N = K
@@ -160,7 +166,7 @@ print("starting sim (" + str(N) + " iterations)")
 
 for k, z_k in tqdm(enumerate(z[:N])):
 
-    eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k], P_pred[k], z_k)
+    eta_hat[k], P_hat[k], NIS[k], a[k], NIS_range[k], NIS_bearing[k] = slam.update(eta_pred[k], P_pred[k], z_k)
 
     if k < K - 1:
         eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k], P_hat[k], odometry[k])
@@ -171,13 +177,20 @@ for k, z_k in tqdm(enumerate(z[:N])):
 
     num_asso = np.count_nonzero(a[k] > -1)
 
+    CI_rangebearing[k] = chi2.interval(confprob, num_asso)
     CI[k] = chi2.interval(confprob, 2 * num_asso)
 
     if num_asso > 0:
+        NISnorm_range[k] = NIS_range[k] / num_asso
+        NISnorm_bearing[k] = NIS_bearing[k] / num_asso
         NISnorm[k] = NIS[k] / (2 * num_asso)
         CInorm[k] = CI[k] / (2 * num_asso)
+        CInorm_rangebearing[k] = CI_rangebearing[k] / num_asso
     else:
+        NISnorm_range[k] = 1
+        NISnorm_bearing[k] = 1
         NISnorm[k] = 1
+        CInorm_rangebearing[k].fill(1)
         CInorm[k].fill(1)
 
     NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k])
@@ -216,7 +229,7 @@ offsets = ranges * 0.2
 mins -= offsets
 maxs += offsets
 
-fig2, ax2 = plt.subplots(num=2, clear=True)
+fig2, ax2 = plt.subplots(clear=True)
 # landmarks
 ax2.scatter(*landmarks.T, c="r", marker="^")
 ax2.scatter(*lmk_est_final.T, c="b", marker=".")
@@ -243,14 +256,25 @@ CI3 = chi2.interval(confprob, 3)
 CI1N = np.array(chi2.interval(confprob, 1*N)) / N
 CI2N = np.array(chi2.interval(confprob, 2*N)) / N
 CI3N = np.array(chi2.interval(confprob, 3*N)) / N
+df_anis = 2 * sum([np.count_nonzero(ak > -1) for ak in a])
+CIANIS = np.array(chi2.interval(confprob, df_anis))/len(NIS)
+df_rangebearing = sum([np.count_nonzero(ak > -1) for ak in a])
+CIANIS_rangebearing = np.array(chi2.interval(confprob, df_rangebearing))/len(NIS_bearing)
 
 NEESpose, NEESpos, NEESpsi = NEESes.T
 insideCIpose = (CI3[0] <= NEESpose) * (NEESpose <= CI3[1])
 insideCIpos = (CI2[0] <= NEESpos) * (NEESpos <= CI2[1])
 insideCIpsi = (CI1[0] <= NEESpsi) * (NEESpsi <= CI1[1])
+insideCIrange = (CInorm_rangebearing[:N,0] <= NISnorm_range[:N]) * (NISnorm_range[:N] <= CInorm_rangebearing[:N,1])
+insideCIbearing = (CInorm_rangebearing[:N,0] <= NISnorm_bearing[:N]) * (NISnorm_bearing[:N] <= CInorm_rangebearing[:N,1])
+
+
 ANEESpose = NEESpose.mean()
 ANEESpos = NEESpos.mean()
 ANEESpsi = NEESpsi.mean()
+ANIS = NIS.mean()
+ANIS_range = NIS_range.mean()
+ANIS_bearing = NIS_bearing.mean()
 
 insideCI = (CInorm[:N,0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N,1])
 
@@ -258,21 +282,25 @@ consistencydatas = [
         dict(avg=ANEESpose,inside=insideCIpose.mean(), text="NEES pose",CI=CI3N),
         dict(avg=ANEESpos,inside=insideCIpos.mean(), text="NEES pos",CI=CI2N),
         dict(avg=ANEESpsi,inside=insideCIpsi.mean(), text="NEES psi",CI=CI1N),
-        dict(inside=insideCI.mean(), text="NIS"),
+        dict(avg=ANIS,inside=insideCI.mean(), text="NIS",CI=CIANIS),
+        dict(avg=ANIS_range,inside=insideCIrange.mean(), text="NIS range",CI=CIANIS_rangebearing),
+        dict(avg=ANIS_bearing,inside=insideCIbearing.mean(), text="NIS bearing",CI=CIANIS_rangebearing),
 ]
 
 latexutils.save_consistency_results(consistencydatas, "consistency.csv")
 
-print("ANEESes")
-print(f"\tpose\t{ANEESpose}\t{CI3N}")
-print(f"\tpos\t{ANEESpos}\t{CI2N}")
-print(f"\tpsi\t{ANEESpsi}\t{CI1N}")
-print(f"NIS: {insideCI.mean():.1%} inside")
 
+print(f"{'ANEESpose':<20} {ANEESpose:<20}\t{CI3N}")
+print(f"{'ANEESpos':<20} {ANEESpos:<20}\t{CI2N}")
+print(f"{'ANEESpsi':<20} {ANEESpsi:<20}\t{CI1N}")
+print(f"{'ANIS':<20} {ANIS:<20.3f}\t{CIANIS}")
+print(f"{'ANIS range':<20} {ANIS_range:<20.3f}\t{CIANIS_rangebearing}")
+print(f"{'ANIS bearing':<20} {ANIS_bearing:<20.3f}\t{CIANIS_rangebearing}")
+print(f"{'NIS':<20} {insideCI.mean():.1%} inside")
 
 # NIS
 
-fig3, ax3 = plt.subplots(num=3, clear=True)
+fig3, ax3 = plt.subplots(clear=True)
 nis_str = f"NIS ({insideCI.mean():.1%} inside)"
 plot.pretty_NEESNIS(ax3, t, NISnorm[:N], nis_str, CInorm[:N,0], CInorm[:N,1])
 ax3.legend(loc="upper right")
@@ -282,7 +310,7 @@ latexutils.save_fig(fig3, "NIS.pdf")
 
 # NEES
 
-fig4, ax4 = plt.subplots(nrows=3, ncols=1, num=4, clear=True, sharex=True)
+fig4, ax4 = plt.subplots(nrows=3, ncols=1, clear=True, sharex=True)
 pose_str = f"NEES pose ({insideCIpose.mean():.1%} inside)"
 plot.pretty_NEESNIS(ax4[0], t, NEESpose, pose_str, CI3[0], CI3[1])
 pos_str = f"NEES pos ({insideCIpos.mean():.1%} inside)"
@@ -300,19 +328,33 @@ fig4.tight_layout()
 
 latexutils.save_fig(fig4, "NEES.pdf")
 
+
+# Decomposed NISes
+fig, axs = plt.subplots(2,1, sharex=True)
+range_str = f"NIS range ({insideCIrange.mean():.1%} inside)"
+plot.pretty_NEESNIS(axs[0], t, NISnorm_range[:N], range_str, CInorm_rangebearing[:N,0], CInorm_rangebearing[:N,1])
+bearing_str = f"NIS bearing ({insideCIbearing.mean():.1%} inside)"
+plot.pretty_NEESNIS(axs[1], t, NISnorm_bearing[:N], bearing_str, CInorm_rangebearing[:N,0], CInorm_rangebearing[:N,1])
+for ax in axs:
+    ax.legend(loc="upper right")
+fig.tight_layout()
+
+latexutils.save_fig(fig, "NIS_decomposed.pdf")
+
+
 # %% RMSE
 pos_err = np.linalg.norm(pose_est[:N,:2] - poseGT[:N,:2], axis=1)
 heading_err = np.rad2deg(np.abs(utils.wrapToPi(pose_est[:N,2] - poseGT[:N,2])))
 pos_rmse = np.sqrt((pos_err**2).mean())
 heading_rmse = np.sqrt((heading_err**2).mean())
 
-fig5, ax5 = plt.subplots(nrows=2, ncols=1, num=5, clear=True, sharex=True)
+fig5, ax5 = plt.subplots(nrows=2, ncols=1, clear=True, sharex=True)
 
-ax5[0].plot(t,pos_err, label="Position error")
+ax5[0].plot(t,pos_err, label=f"Position error ({pos_rmse:.3f})")
 #ax5[0].plot([t[0],t[~0]], [pos_rmse]*2, label="Position RMSE")
 ax5[0].set_ylabel("[m]")
 #ax5[0].set_title(f"pos: RMSE {} [m]")
-ax5[1].plot(t,heading_err, label="Heading error")
+ax5[1].plot(t,heading_err, label=f"Heading error ({heading_rmse:.3f})")
 #ax5[1].plot([t[0],t[~0]], [heading_rmse]*2, label="Heading RMSE")
 ax5[1].set_ylabel("[deg]")
 #ax5[1].set_title(f"heading: RMSE {np.sqrt((heading_err**2).mean()):.4f} [deg]")
@@ -324,6 +366,7 @@ for ax in ax5:
     ax.grid(True)
 
 fig5.tight_layout()
+fig5.align_ylabels()
 
 latexutils.save_fig(fig5, "RMSE.pdf")
 
@@ -336,7 +379,7 @@ if playMovie:
         from celluloid import Camera
 
         pauseTime = 0.05
-        fig_movie, ax_movie = plt.subplots(num=6, clear=True)
+        fig_movie, ax_movie = plt.subplots(clear=True)
 
         camera = Camera(fig_movie)
 

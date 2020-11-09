@@ -443,6 +443,7 @@ class EKFSLAM:
                 etaupd = eta
                 Pupd = P
                 NIS = 1 # TODO: beware this one when analysing consistency.
+                NIS_range, NIS_bearing = 1, 1
 
             else:
                 # Create the associated innovation
@@ -472,6 +473,13 @@ class EKFSLAM:
 
                 # calculate NIS, can use S_cho_factors
                 NIS = v.T @ la.cho_solve(S_cho_factors, v)
+
+                v_ranges = v[0::2]
+                v_bearings = v[1::2]
+                Sa_ranges_cho_factors = la.cho_factor(Sa[0::2,0::2])
+                Sa_bearing_cho_factors = la.cho_factor(Sa[1::2,1::2])
+                NIS_range = v_ranges.T @ la.cho_solve(Sa_ranges_cho_factors, v_ranges)
+                NIS_bearing = v_bearings.T @ la.cho_solve(Sa_bearing_cho_factors, v_bearings)
                 #NIS = v.T @ Sa_inv @ v
 
                 # When tested, remove for speed
@@ -485,7 +493,8 @@ class EKFSLAM:
             z = z.flatten()
             etaupd = eta
             Pupd = P
-            NIS = 0 # TODO: beware this one, you can change the value to for instance 1
+            NIS = 0
+            NIS_range, NIS_bearing = 0, 0
 
         # Create new landmarks if any is available
         if self.do_asso:
@@ -500,7 +509,7 @@ class EKFSLAM:
         assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd must be symmetric"
         assert np.all(np.linalg.eigvals(Pupd) >= 0), "EKFSLAM.update: Pupd must be PSD"
 
-        return etaupd, Pupd, NIS, a
+        return etaupd, Pupd, NIS, a, NIS_range, NIS_bearing
 
     @classmethod
     def NEESes(cls, x: np.ndarray, P: np.ndarray, x_gt: np.ndarray,) -> np.ndarray:
