@@ -84,7 +84,7 @@ from EKFSLAM import EKFSLAM
 from plotting import ellipse
 
 latexutils.set_save_dir("sim_results")
-parameters_good = dict(
+parameters = dict(
     sigma_x = 0.025,
     sigma_y = 0.02,
     sigma_psi = np.deg2rad(0.37),
@@ -95,6 +95,18 @@ parameters_good = dict(
     alpha_consistency = 0.05,
 )
 parameters = dict(
+    sigma_x = 0.025,
+    sigma_y = 0.02,
+    sigma_psi = np.deg2rad(0.37),
+    sigma_range = 0.06,
+    sigma_bearing = np.deg2rad(1.2),
+    alpha_individual = 1e-5,
+    alpha_joint = 1e-5,
+    alpha_consistency = 0.05,
+)
+
+# Parameters found by looking at odom error and tuning only range/bearing/alpha
+parameters_initial = dict(
     sigma_x = 0.05,
     sigma_y = 0.05,
     sigma_psi = np.deg2rad(1),
@@ -104,6 +116,7 @@ parameters = dict(
     alpha_joint = 1e-3,
     alpha_consistency = 0.05,
 )
+
 p = parameters
 doAsso = True
 doAssoPlot = False

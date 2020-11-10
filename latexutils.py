@@ -38,6 +38,15 @@ def sig_exp_e(num_str):
     v, exp = num_str.split('e')
     return float(v), int(exp)
 
+def _tentothepower(paramname, paramdict):
+    p = paramdict
+    pt = PARAMETER_TO_TEXNAME
+
+    v, exp = sig_exp_e(str(p[paramname]))
+    v_str = "" if abs(v-1) < 0.0001 else str(v)
+    return v_str +" 10^{" + str(exp) + "}"
+
+
 def parameter_to_texvalues(params):
     parameter_tex_dict = {}
     for paramname,value in params.items():
@@ -46,8 +55,15 @@ def parameter_to_texvalues(params):
             parameter_tex_dict[tex_key] = value
 
     p = params
-    parameter_tex_dict[r"\sigma_\theta"] = f"{rad2deg(p['sigma_bearing'])}" + r" \text{deg}"
+    pt = PARAMETER_TO_TEXNAME
+
     parameter_tex_dict[r"\sigma_\psi"] = f"{rad2deg(p['sigma_psi'])}" + r" \text{deg}"
+
+    parameter_tex_dict[r"\sigma_\theta"] = f"{rad2deg(p['sigma_bearing'])}" + r" \text{deg}"
+
+    parameter_tex_dict[pt["alpha_individual"]] = _tentothepower("alpha_individual", p)
+    parameter_tex_dict[pt["alpha_joint"]] = _tentothepower("alpha_joint", p)
+
 
     return parameter_tex_dict
 
