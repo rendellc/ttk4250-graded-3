@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
 
 BIGPLOTSIZE = (3.5, 6)
+HEATMAP_COLORS = [[0,1,0,1],[1,0,0,1]]
+HEATMAP_CM = LinearSegmentedColormap.from_list("heatmap_cm",HEATMAP_COLORS)
 
 def trajectoryPlot3D(x_est, x_true, z_GNSS, N, GNSSk):
     # 3d position plot
@@ -270,7 +273,45 @@ def plot_NIS(NIS, CI, NIS_name, confprob, dt, N, GNSSk, ax=None):
     ax.set_xlim(0,(N-1)*dt)
     ax.set_ylim(0,upperY)
 
-def heatmap(ax, pos, weights, xlim, ylim, bins=25, cmin=None):
-    ax.hist2d(pos[:,0], pos[:,1], weights=weights, bins=bins, range=[xlim, ylim], cmin=cmin)
+def heatmap(fig, ax, pos, weights, xlim=None, ylim=None, bins=50, cmin=None):
+    assert len(pos) == len(weights)
+
+    if xlim is None:
+        xlim = [np.min(pos[:,0]), np.max(pos[:,0])]
+    if ylim is None:
+        ylim = [np.min(pos[:,1]), np.max(pos[:,1])]
+
+    pos_normalized = np.vstack([
+        (pos[:,0] - xlim[0])/(xlim[1] - xlim[0]),
+        (pos[:,1] - ylim[0])/(ylim[1] - ylim[0])
+    ]).T
+
+    assert pos.shape == pos_normalized.shape
+
+    region = np.zeros((bins,bins))
+    counter = np.zeros_like(region)
+    pos_indices = np.asarray(bins*pos_normalized, dtype=int)
+
+    for k, (xi,yi) in enumerate(pos_indices):
+        if 0 <= xi < bins and 0 <= yi < bins:
+            region[yi,xi] += weights[k]
+            counter[yi,xi] += 1
+
+    # compute average
+    mask = counter != 0
+    region[mask] = region[mask]/counter[mask]
+
+    alpha = counter.copy()
+    #alpha[mask] = alpha[mask]/np.max(counter)
+    alpha[mask] = 1.0 # set all alphas to 1 where a count has occured
+
+
+    im = ax.imshow(region, alpha=alpha,
+            extent=(*xlim, *ylim), interpolation="bilinear",cmap=HEATMAP_CM,
+            origin="lower")
+
+    #fig.colorbar(im, ax=ax)
+    #ax.hist2d(pos[:,0], pos[:,1], weights=weights, bins=bins, range=[xlim, ylim], cmin=cmin)
+    return im
 
 

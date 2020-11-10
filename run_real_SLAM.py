@@ -117,11 +117,11 @@ car = Car(L, H, a, b)
 latexutils.set_save_dir("real_results")
 
 parameters = dict(
-    sigma_x = 0.5,
-    sigma_y = 0.5,
-    sigma_psi = np.deg2rad(0.15),
-    sigma_range = 0.05,
-    sigma_bearing = np.deg2rad(0.5),
+    sigma_x = 0.2,
+    sigma_y = 0.2,
+    sigma_psi = np.deg2rad(0.25),
+    sigma_range = 0.5,
+    sigma_bearing = np.deg2rad(1),
     alpha_individual = 1e-7,
     alpha_joint = 1e-7,
     alpha_consistency = 0.05,
@@ -179,7 +179,8 @@ NISy = np.zeros(mK)
 NISxy = np.zeros(mK)
 
 # Initialize state
-eta = np.array([Lo_m[0], La_m[0], 36 * np.pi / 180]) # you might want to tweak these for a good reference
+eta = np.array([Lo_m[0], La_m[0], 40 * np.pi / 180]) # you might want to tweak these for a good reference
+#eta = np.array([Lo_m[0], La_m[0], 36 * np.pi / 180]) # you might want to tweak these for a good reference
 P = np.zeros((3, 3))
 
 
@@ -188,7 +189,7 @@ mk = mk_first
 t = timeOdo[0]
 
 # %%  run
-N = 15000
+N = K
 
 doPlot = False
 doExtraPlots = True
@@ -497,6 +498,7 @@ if doExtraPlots:
         label="GPS",
     )
     ax13.legend()
+    latexutils.save_fig(fig13, "trajectory_gps.pdf")
 
     fig14, ax14 = plt.subplots(1,1)
     ax14.plot(timeOdo[:k], xpred[:k,0], label="predict x")
@@ -535,6 +537,24 @@ latexutils.save_fig(fig12, "NISxy.pdf")
 # axGPSdistmap.set_title("GPS distance")
 # 
 # latexutils.save_fig(figGPSdistmap, "gps_error_map.pdf")
+
+if doExtraPlots:
+    figCovmap, axCovmap = plt.subplots(1,1)
+    P_norms = np.array([np.linalg.norm(P) for P in P_pose])
+    plot.heatmap(figCovmap, axCovmap, xpred[:k,:2], P_norms, [-200,200],[-200,200])
+    axCovmap.plot(xupd[:mk,0], xupd[:mk,1], label="estimated trajectory")
+    axCovmap.set_title(r"$|P_{xx}|$")
+    axCovmap.axis("equal")
+
+    latexutils.save_fig(figCovmap, "cov_map.pdf")
+
+    figGPSdistmap, axGPSdistmap = plt.subplots(1,1)
+    plot.heatmap(figGPSdistmap, axGPSdistmap, xupd[mk_first:mk,:2], GPSerror[mk_first:mk],[-200,200],[-200,200])
+    axGPSdistmap.plot(xupd[mk_first:mk,0], xupd[mk_first:mk,1], label="estimated trajectory")
+    axGPSdistmap.set_title("GPS distance")
+    axGPSdistmap.axis("equal")
+
+    latexutils.save_fig(figGPSdistmap, "gps_error_map.pdf")
 
 if interactive_mode:
     plt.show(block=False)
