@@ -84,7 +84,7 @@ from EKFSLAM import EKFSLAM
 from plotting import ellipse
 
 latexutils.set_save_dir("sim_results")
-parameters = dict(
+parameters_good = dict(
     sigma_x = 0.025,
     sigma_y = 0.02,
     sigma_psi = np.deg2rad(0.37),
@@ -94,16 +94,26 @@ parameters = dict(
     alpha_joint = 1e-5,
     alpha_consistency = 0.05,
 )
+parameters = dict(
+    sigma_x = 0.05,
+    sigma_y = 0.05,
+    sigma_psi = np.deg2rad(1),
+    sigma_range = 0.05,
+    sigma_bearing = np.deg2rad(1),
+    alpha_individual = 1e-3,
+    alpha_joint = 1e-3,
+    alpha_consistency = 0.05,
+)
 p = parameters
 doAsso = True
 doAssoPlot = False
+doExtraPlots = True
 playMovie = False
 saveMovie = False
 
 latexutils.save_params_to_csv(
     latexutils.parameter_to_texvalues(parameters),
     "parameters.csv")
-
 
 # %% Load data
 simSLAM_ws = loadmat("simulatedSLAM")
@@ -115,8 +125,13 @@ poseGT = simSLAM_ws["poseGT"].T
 
 
 
+# %% Run simulation
 K = len(z) 
 M = len(landmarks)
+N = K
+t = np.arange(N)
+
+
 
 # %% Initilize
 Q = np.diag([p["sigma_x"],p["sigma_y"],p["sigma_psi"]])**2
@@ -154,13 +169,45 @@ P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
 
 # %% Set up plotting
 # plotting
+doLivePlot = False
+if doLivePlot:
+    figLive, axLive = plt.subplots(1,2)
+    xyLiveLine, = axLive[0].plot([],[], label="ground truth")
+    errLiveLine, = axLive[1].plot([],[], label="position error")
+
+    axLive[0].set_xlim([-200,200])
+    axLive[0].set_ylim([-200,200])
 
 if doAssoPlot:
     figAsso, axAsso = plt.subplots( clear=True)
 
-# %% Run simulation
-N = K
-t = np.arange(N)
+if doExtraPlots:
+    posdiff_world = np.diff(poseGT[:,:2],axis=0)
+    psidiff = np.diff(poseGT[:,2])
+
+    posdiff_body = []
+    for k, heading in enumerate(poseGT[:~0,2]):
+        R = utils.rotmat2d(-heading)
+        posdiff_body.append(R @ posdiff_world[k])
+    posdiff_body = np.array(posdiff_body)
+
+    posodometry_error = odometry[:,:2] - posdiff_body
+    psiodometry_error = odometry[:,2] - psidiff
+
+    print("sigma_x", np.std(posodometry_error[:,0]), "[m]")
+    print("sigma_y", np.std(posodometry_error[:,1]), "[m]")
+    print("sigma_psi", np.rad2deg(np.std(psiodometry_error)), "[deg]")
+
+    figOdoErr, axOdoErr = plt.subplots(2,1, sharex=True)
+    axOdoErr[0].plot(t, posodometry_error[:,0], label="odom error x")
+    axOdoErr[0].plot(t, posodometry_error[:,1], label="odom error y")
+    axOdoErr[0].legend(loc="upper right")
+    axOdoErr[1].plot(t, np.rad2deg(psiodometry_error), label=r"odom error $\psi$")
+    axOdoErr[1].legend(loc="upper right")
+
+    latexutils.save_fig(figOdoErr, "odom_error.pdf")
+
+
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -210,6 +257,21 @@ for k, z_k in tqdm(enumerate(z[:N])):
         plt.draw()
         plt.pause(0.001)
 
+    if doLivePlot and k > 0:
+        xyLiveLine.set_data(poseGT[:k,0], poseGT[:k,1])
+        pos_est = np.array([eta[:2] for eta in eta_hat[:k]])
+        pos_gt = poseGT[:N,:2]
+
+        pos_err = np.linalg.norm(pos_est[:k] - pos_gt[:k], axis=1)
+        errLiveLine.set_xdata(t[:k])
+        errLiveLine.set_ydata(pos_err)
+        axLive[1].relim()
+        axLive[1].autoscale_view()
+        plt.draw()
+        plt.pause(0.001)
+
+
+
 
 print("sim complete")
 
@@ -243,7 +305,7 @@ for l, lmk_l in enumerate(lmk_est_final):
 ax2.plot(*poseGT.T[:2], c="r", label="gt")
 ax2.plot(*pose_est.T[:2], c="g", label="est")
 ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+ax2.set(xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
 ax2.axis("equal")
 ax2.grid()
 
@@ -347,6 +409,9 @@ pos_err = np.linalg.norm(pose_est[:N,:2] - poseGT[:N,:2], axis=1)
 heading_err = np.rad2deg(np.abs(utils.wrapToPi(pose_est[:N,2] - poseGT[:N,2])))
 pos_rmse = np.sqrt((pos_err**2).mean())
 heading_rmse = np.sqrt((heading_err**2).mean())
+
+print("Position RMSE", pos_rmse)
+print("Heading RMSE", heading_rmse)
 
 fig5, ax5 = plt.subplots(nrows=2, ncols=1, clear=True, sharex=True)
 

@@ -117,13 +117,13 @@ car = Car(L, H, a, b)
 latexutils.set_save_dir("real_results")
 
 parameters = dict(
-    sigma_x = 0.05,
-    sigma_y = 0.05,
-    sigma_psi = np.deg2rad(0.25),
-    sigma_range = 0.5,
-    sigma_bearing = np.deg2rad(1),
-    alpha_individual = 1e-10,
-    alpha_joint = 1e-10,
+    sigma_x = 0.5,
+    sigma_y = 0.5,
+    sigma_psi = np.deg2rad(0.10),
+    sigma_range = 0.05,
+    sigma_bearing = np.deg2rad(0.5),
+    alpha_individual = 1e-7,
+    alpha_joint = 1e-7,
     alpha_consistency = 0.05,
 )
 p = parameters
@@ -188,7 +188,7 @@ mk = mk_first
 t = timeOdo[0]
 
 # %%  run
-N = K
+N = 15000
 
 doPlot = False
 doExtraPlots = True

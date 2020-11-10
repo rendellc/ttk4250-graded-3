@@ -1,7 +1,7 @@
-;\sigma_\text{x};0.05
-;\sigma_\text{y};0.05
-;\sigma_r;0.5
-;\alpha_\text{individual};1e-10
-;\alpha_\text{joint};1e-10
-;\sigma_\theta;1.0 \text{deg}
-;\sigma_\psi;0.25 \text{deg}
+;\sigma_\text{x};0.5
+;\sigma_\text{y};0.5
+;\sigma_r;0.05
+;\alpha_\text{individual};1e-07
+;\alpha_\text{joint};1e-07
+;\sigma_\theta;0.5 \text{deg}
+;\sigma_\psi;0.1 \text{deg}
