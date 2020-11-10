@@ -421,18 +421,18 @@ if playMovie:
             "Install celluloid module, \n\n$ pip install celluloid\n\nto get fancy animation of EKFSLAM."
         )
 
-figCovmap, axCovmap = plt.subplots(1,1)
-P_pose_hat = [P_hat[k][:3,:3] for k in range(len(P_hat))]
-P_norms_inv = 1/np.array([np.linalg.norm(P) for P in P_pose_hat])
-pos = np.array([eta_hat[k][:2] for k in range(len(eta_hat))])
-plot.heatmap(axCovmap, pos, P_norms_inv, [-200,200], [-200,200])
-
-
-figCovmap, axCovmap = plt.subplots(1,1)
-plot.heatmap(axCovmap, pos, P_norms_inv, [-200,200], [-200,200], bins=15)
-
-figCovmap, axCovmap = plt.subplots(1,1)
-plot.heatmap(axCovmap, pos, P_norms_inv, [-200,200], [-200,200], bins=10)
+# figCovmap, axCovmap = plt.subplots(1,1)
+# P_pose_hat = [P_hat[k][:3,:3] for k in range(len(P_hat))]
+# P_norms_inv = 1/np.array([np.linalg.norm(P) for P in P_pose_hat])
+# pos = np.array([eta_hat[k][:2] for k in range(len(eta_hat))])
+# plot.heatmap(axCovmap, pos, P_norms_inv, [-200,200], [-200,200])
+# 
+# 
+# figCovmap, axCovmap = plt.subplots(1,1)
+# plot.heatmap(axCovmap, pos, P_norms_inv, [-200,200], [-200,200], bins=15)
+# 
+# figCovmap, axCovmap = plt.subplots(1,1)
+# plot.heatmap(axCovmap, pos, P_norms_inv, [-200,200], [-200,200], bins=10)
 
 if interactive_mode:
     plt.show(block=False)
