@@ -273,13 +273,17 @@ def plot_NIS(NIS, CI, NIS_name, confprob, dt, N, GNSSk, ax=None):
     ax.set_xlim(0,(N-1)*dt)
     ax.set_ylim(0,upperY)
 
-def heatmap(fig, ax, pos, weights, xlim=None, ylim=None, bins=50, cmin=None):
+def heatmap(fig, ax, pos, weights, xlim=None, ylim=None, bins=50, cmin=None, wmin=None, wmax=None):
     assert len(pos) == len(weights)
 
     if xlim is None:
         xlim = [np.min(pos[:,0]), np.max(pos[:,0])]
     if ylim is None:
         ylim = [np.min(pos[:,1]), np.max(pos[:,1])]
+    if wmin is None:
+        wmin = np.min(weights)
+    if wmax is None:
+        wmax = np.max(weights)
 
     pos_normalized = np.vstack([
         (pos[:,0] - xlim[0])/(xlim[1] - xlim[0]),
@@ -300,18 +304,32 @@ def heatmap(fig, ax, pos, weights, xlim=None, ylim=None, bins=50, cmin=None):
     # compute average
     mask = counter != 0
     region[mask] = region[mask]/counter[mask]
+    np.clip(region, wmin, wmax, out=region)
+    # normalize from 0 to 1 for propper colormapping
+    region = (region - wmin)/(wmax-wmin) 
 
-    alpha = counter.copy()
+    image = HEATMAP_CM(region)
+    image[counter == 0, 3] = 0.0
+    #alpha = counter.copy()
     #alpha[mask] = alpha[mask]/np.max(counter)
-    alpha[mask] = 1.0 # set all alphas to 1 where a count has occured
 
 
-    im = ax.imshow(region, alpha=alpha,
+    #alpha[mask] = 1.0 # set all alphas to 1 where a count has occured
+
+
+
+
+    im = ax.imshow(image, 
             extent=(*xlim, *ylim), interpolation="bilinear",cmap=HEATMAP_CM,
-            origin="lower")
+            aspect="equal", origin="lower")
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
 
-    #fig.colorbar(im, ax=ax)
+    colorbar = fig.colorbar(im, ax=ax)
+    colorbar.ax.locator_params(nbins=3)
+    colorbar.ax.set_yticklabels([f"{wmin:.3f}", '', f">{wmax:.3f}"])
+
     #ax.hist2d(pos[:,0], pos[:,1], weights=weights, bins=bins, range=[xlim, ylim], cmin=cmin)
-    return im
+    return colorbar
 
 

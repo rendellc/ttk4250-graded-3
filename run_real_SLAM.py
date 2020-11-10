@@ -196,13 +196,22 @@ doExtraPlots = True
 doGpsErrorCheck = False
 lh_pose = None
 
-# callback for clicking on plot
+# setup add callbacks for aborting run
 abort = False
 def onclick(event):
     global abort
     if abs(event.x) + abs(event.y) < 50:
         abort = True 
 
+import signal
+original_sigint_handler = signal.getsignal(signal.SIGINT)
+def interrupthandler(signum, frame):
+    global abort
+    abort = True
+
+    signal.signal(signal.SIGINT, original_sigint_handler)
+
+signal.signal(signal.SIGINT, interrupthandler)
 
 
 if doPlot:
@@ -359,19 +368,21 @@ latexutils.save_fig(figGps, "gps_distance.pdf")
 CI2N = np.array(chi2.interval(confprob, 2*N)) / N
 
 df_anis = 2 * sum([np.count_nonzero(ak > -1) for ak in a[mk_first:mk]])
-CIANIS = np.array(chi2.interval(confprob, df_anis))/len(NIS)
+CIANIS = np.array(chi2.interval(confprob, df_anis))/(mk-mk_first)
 df_rangebearing = sum([np.count_nonzero(ak > -1) for ak in a[mk_first:mk]])
-CIANIS_rangebearing = np.array(chi2.interval(confprob, df_rangebearing))/len(NIS_bearing)
+CIANIS_rangebearing = np.array(chi2.interval(confprob, df_rangebearing))/(mk-mk_first)
 
-insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
+insideCI = (CInorm[mk_first:mk, 0] <= NISnorm[mk_first:mk]) * (NISnorm[mk_first:mk] <= CInorm[mk_first:mk, 1])
 insideCIxy = (CI2[0] <= NISxy[:gpsk]) * (NISxy[:gpsk] <= CI2[1])
 insideCIx = (CI1[0] <= NISx[:gpsk]) * (NISx[:gpsk] <= CI1[1])
 insideCIy = (CI1[0] <= NISy[:gpsk]) * (NISy[:gpsk] <= CI1[1])
 insideCIxyraw = (CI2[0] <= NISxyraw[:gpsk]) * (NISxyraw[:gpsk] <= CI2[1])
 insideCIxraw = (CI1[0] <= NISxraw[:gpsk]) * (NISxraw[:gpsk] <= CI1[1])
 insideCIyraw = (CI1[0] <= NISyraw[:gpsk]) * (NISyraw[:gpsk] <= CI1[1])
-insideCIrange = (CInorm_rangebearing[:mk,0] <= NISnorm_range[:mk]) * (NISnorm_range[:mk] <= CInorm_rangebearing[:mk,1])
-insideCIbearing = (CInorm_rangebearing[:mk,0] <= NISnorm_bearing[:mk]) * (NISnorm_bearing[:mk] <= CInorm_rangebearing[:mk,1])
+insideCIrange = (CInorm_rangebearing[mk_first:mk,0] <= NISnorm_range[mk_first:mk]) \
+        * (NISnorm_range[mk_first:mk] <= CInorm_rangebearing[mk_first:mk,1])
+insideCIbearing = (CInorm_rangebearing[mk_first:mk,0] <= NISnorm_bearing[mk_first:mk]) \
+        * (NISnorm_bearing[mk_first:mk] <= CInorm_rangebearing[mk_first:mk,1])
 
 ANIS = NIS.mean()
 ANIS_range = NIS_range.mean()
@@ -541,17 +552,20 @@ latexutils.save_fig(fig12, "NISxy.pdf")
 if doExtraPlots:
     figCovmap, axCovmap = plt.subplots(1,1)
     P_norms = np.array([np.linalg.norm(P) for P in P_pose])
-    plot.heatmap(figCovmap, axCovmap, xpred[:k,:2], P_norms, [-200,200],[-200,200])
-    axCovmap.plot(xupd[:mk,0], xupd[:mk,1], label="estimated trajectory")
-    axCovmap.set_title(r"$|P_{xx}|$")
+    #axCovmap.plot(xupd[:mk,0], xupd[:mk,1], label="estimated trajectory")
+    axCovmap.scatter(xupd[mk_first,0], xupd[mk_first,1], s=1, c="k", label="start")
+    colorbar = plot.heatmap(figCovmap, axCovmap, xpred[:k,:2], P_norms, [-200,100],[-100,200])
+    colorbar.ax.set_yticklabels([])
+    #axCovmap.set_title(r"$|P_{xx}|$")
     axCovmap.axis("equal")
 
     latexutils.save_fig(figCovmap, "cov_map.pdf")
 
     figGPSdistmap, axGPSdistmap = plt.subplots(1,1)
-    plot.heatmap(figGPSdistmap, axGPSdistmap, xupd[mk_first:mk,:2], GPSerror[mk_first:mk],[-200,200],[-200,200])
-    axGPSdistmap.plot(xupd[mk_first:mk,0], xupd[mk_first:mk,1], label="estimated trajectory")
-    axGPSdistmap.set_title("GPS distance")
+    #axGPSdistmap.plot(xupd[mk_first:mk,0], xupd[mk_first:mk,1], label="estimated trajectory")
+    axGPSdistmap.scatter(xupd[mk_first,0], xupd[mk_first,1], s=1, c="k", label="start")
+    plot.heatmap(figGPSdistmap, axGPSdistmap, xupd[mk_first:mk,:2], GPSerror[mk_first:mk],[-200,100],[-100,200], wmax=15)
+    #axGPSdistmap.set_title("GPS distance")
     axGPSdistmap.axis("equal")
 
     latexutils.save_fig(figGPSdistmap, "gps_error_map.pdf")

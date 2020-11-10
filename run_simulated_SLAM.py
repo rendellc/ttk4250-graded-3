@@ -4,6 +4,7 @@ from typing import List, Optional
 from scipy.io import loadmat
 import numpy as np
 
+
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import animation
@@ -504,11 +505,35 @@ if doExtraPlots:
     P_pose_hat = [P_hat[k][:3,:3] for k in range(len(P_hat))]
     P_norms = np.array([np.linalg.norm(P) for P in P_pose_hat])
     pos = np.array([eta_hat[k][:2] for k in range(len(eta_hat))])
-    plot.heatmap(figCovmap, axCovmap, pos, P_norms_inv, [-200,200], [-200,200])
-    axCovmap.plot(pos[:,0], pos[:,1], c="g", label="slam")
+    #axCovmap.plot(pos[:,0], pos[:,1], c="g", label="slam")
+    axCovmap.scatter(poseGT[0,0], poseGT[0,1], s=1, c="k", label="start")
+    colorbar = plot.heatmap(figCovmap, axCovmap, pos, P_norms, [-150,50], [-50,150])
+    colorbar.ax.set_yticklabels([])
     axCovmap.axis("equal")
+    axCovmap.legend(loc="upper right")
 
     latexutils.save_fig(figCovmap, "cov_map.pdf")
+
+    distance_from_start = np.linalg.norm(poseGT[:N,:2] - poseGT[0,:2], axis=1)
+
+    figErrmap, axErrmap = plt.subplots(1,1)
+    colorbar = plot.heatmap(figErrmap, axErrmap, pos, pos_err, [-150,50], [-50,150])
+    colorbar.ax.set_yticklabels(["0", f'{np.max(pos_err)/2:.1f}', f"{np.max(pos_err):.1f}"])
+    #axErrmap.set_title("Position estimate error")
+    axErrmap.axis("equal")
+    #axErrmap.scatter(pos[0,0], pos[0,1], c="k", label="start")
+    axErrmap.scatter(poseGT[0,0], poseGT[0,1], s=1, c="k", label="start")
+    axErrmap.legend(loc="upper right")
+
+    latexutils.save_fig(figErrmap, "pos_error_map.pdf")
+
+
+    figErrdist, axErrdist = plt.subplots(1,1)
+    axErrdist.scatter(distance_from_start, pos_err)
+    axErrdist.set_xlabel(r"$||x - x_0||$")
+    axErrdist.set_ylabel(r"$||\rho_k - x_k||$")
+
+    latexutils.save_fig(figErrdist, "error_distance.pdf")
 
 
 
