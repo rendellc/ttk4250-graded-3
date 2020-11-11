@@ -117,13 +117,13 @@ car = Car(L, H, a, b)
 latexutils.set_save_dir("real_results")
 
 parameters = dict(
-    sigma_x = 0.2,
-    sigma_y = 0.2,
-    sigma_psi = np.deg2rad(0.25),
-    sigma_range = 0.5,
-    sigma_bearing = np.deg2rad(1),
-    alpha_individual = 1e-7,
-    alpha_joint = 1e-7,
+    sigma_x = 0.02,
+    sigma_y = 0.02,
+    sigma_psi = np.deg2rad(0.2),
+    sigma_range = 0.1,
+    sigma_bearing = np.deg2rad(0.2),
+    alpha_individual = 1e-10, # probability of not associating actual measurement
+    alpha_joint = 1e-11,
     alpha_consistency = 0.05,
 )
 p = parameters
@@ -286,7 +286,7 @@ for k in tqdm(range(N)):
 
             if GPSerror[gpsk] > 25:
                 # gpsk = 3502 gives very large error
-                print("gps error large, aborting")
+                print("gps error large")
                 if doGpsErrorCheck:
                     abort = True
             
@@ -360,11 +360,13 @@ for k in tqdm(range(N)):
 
 
 axGps.plot(timeGps[:gpsk],GPSerror[:gpsk],label="GPS distance")
+axGps.set_ylim(0,25)
+axGps.set_xlim(timeGps[0],timeGps[gpsk])
 latexutils.save_fig(figGps, "gps_distance.pdf")
 
 # %% Consistency
 
-# NIS
+# Confidence intervals
 CI2N = np.array(chi2.interval(confprob, 2*N)) / N
 
 df_anis = 2 * sum([np.count_nonzero(ak > -1) for ak in a[mk_first:mk]])
@@ -384,10 +386,10 @@ insideCIrange = (CInorm_rangebearing[mk_first:mk,0] <= NISnorm_range[mk_first:mk
 insideCIbearing = (CInorm_rangebearing[mk_first:mk,0] <= NISnorm_bearing[mk_first:mk]) \
         * (NISnorm_bearing[mk_first:mk] <= CInorm_rangebearing[mk_first:mk,1])
 
-ANIS = NIS.mean()
-ANIS_range = NIS_range.mean()
-ANIS_bearing = NIS_bearing.mean()
-ANISxy = NISxy.mean()
+ANIS = NIS[mk_first:mk].mean()
+ANIS_range = NIS_range[mk_first:mk].mean()
+ANIS_bearing = NIS_bearing[mk_first:mk].mean()
+ANISxy = NISxy[:gpsk].mean()
 
 print(f"{'ANIS':<20} {ANIS:<20.3f}\t{CIANIS}")
 print(f"{'ANIS xy':<20} {ANISxy:<20.3f}\t{CI2N}")
@@ -396,7 +398,7 @@ print(f"{'ANIS bearing':<20} {ANIS_bearing:<20.3f}\t{CIANIS_rangebearing}")
 
 consistencydatas = [
         dict(avg=ANIS,inside=insideCI.mean(), text="NIS",CI=CIANIS),
-        dict(avg=ANISxy,inside=insideCIxy.mean(), text="NIS",CI=CI2),
+        #dict(avg=ANISxy,inside=insideCIxy.mean(), text="NIS xy",CI=CI2),
         dict(avg=ANIS_range,inside=insideCIrange.mean(), text="NIS range",CI=CIANIS_rangebearing),
         dict(avg=ANIS_bearing,inside=insideCIbearing.mean(), text="NIS bearing",CI=CIANIS_rangebearing),
 ]
@@ -406,18 +408,18 @@ latexutils.save_consistency_results(consistencydatas, "consistency.csv")
 
 fig3, ax3 = plt.subplots(clear=True)
 nis_str = f"NIS ({insideCI.mean():.1%} inside)"
-plot.pretty_NEESNIS(ax3, timeLsr[:mk], NISnorm[:mk], nis_str, CInorm[:mk,0], CInorm[:mk,1])
+plot.pretty_NEESNIS(ax3, timeLsr[mk_first:mk], NISnorm[mk_first:mk], nis_str, CInorm[mk_first:mk,0], CInorm[mk_first:mk,1])
 ax3.legend()
 latexutils.save_fig(fig3, "NIS.pdf")
 
 # Decomposed NISes
 fig, axs = plt.subplots(2,1, sharex=True)
 range_str = f"NIS range ({insideCIrange.mean():.1%} inside)"
-plot.pretty_NEESNIS(axs[0], timeLsr[:mk], NISnorm_range[:mk], range_str,
-    CInorm_rangebearing[:mk,0], CInorm_rangebearing[:mk,1])
+plot.pretty_NEESNIS(axs[0], timeLsr[mk_first:mk], NISnorm_range[mk_first:mk], range_str,
+    CInorm_rangebearing[mk_first:mk,0], CInorm_rangebearing[mk_first    :mk,1])
 bearing_str = f"NIS bearing ({insideCIbearing.mean():.1%} inside)"
-plot.pretty_NEESNIS(axs[1], timeLsr[:mk], NISnorm_bearing[:mk], bearing_str,
-    CInorm_rangebearing[:mk,0], CInorm_rangebearing[:mk,1])
+plot.pretty_NEESNIS(axs[1], timeLsr[mk_first:mk], NISnorm_bearing[mk_first:mk], bearing_str,
+    CInorm_rangebearing[mk_first:mk,0], CInorm_rangebearing[mk_first:mk,1])
 for ax in axs:
     ax.legend(loc="upper right")
 fig.tight_layout()
@@ -464,9 +466,9 @@ if do_raw_prediction:
     ax10s[0].plot(timeOdo[:N], odos[:N,0], label=r"odom $x$")
     ax10s[1].plot(timeOdo[:N], odos[:N,1], label=r"odom $y$")
     ax10s[2].plot(timeOdo[:N], odos[:N,2], label=r"odom $\psi$")
-    ax10s[0].legend()
-    ax10s[1].legend()
-    ax10s[2].legend()
+    ax10s[0].legend(loc="upper right")
+    ax10s[1].legend(loc="upper right")
+    ax10s[2].legend(loc="upper right")
 
     latexutils.save_fig(fig10, "odom.pdf")
     
@@ -484,8 +486,8 @@ latexutils.save_fig(fig6, "finalupdate.pdf")
 # %%
 if doExtraPlots:
     fig7, ax7 = plt.subplots(clear=True)
-    P_norm = np.linalg.norm(P_pose[:mk], axis=(1,2))
-    ax7.plot(timeLsr[:mk], P_norm)
+    P_norm = np.linalg.norm(P_pose[mk_first:mk], axis=(1,2))
+    ax7.plot(timeLsr[mk_first:mk], P_norm)
     ax7.set_title("P pose norm")
     latexutils.save_fig(fig7, "pose_covariance.pdf")
 
@@ -495,7 +497,7 @@ if doExtraPlots:
     latexutils.save_fig(fig8, "num_landmarks.pdf")
 
     fig11, ax11 = plt.subplots(clear=True)
-    ax11.plot(timeLsr[:mk], np.rad2deg(xupd[:mk,2]))
+    ax11.plot(timeLsr[mk_first:mk], np.rad2deg(xupd[mk_first:mk,2]))
     ax11.set_title("Heading estimate (deg)")
     latexutils.save_fig(fig11, "heading_estimate.pdf")
 
@@ -513,7 +515,7 @@ if doExtraPlots:
 
     fig14, ax14 = plt.subplots(1,1)
     ax14.plot(timeOdo[:k], xpred[:k,0], label="predict x")
-    ax14.plot(timeLsr[:mk], xupd[:mk,0], label="update x")
+    ax14.plot(timeLsr[mk_first:mk], xupd[mk_first:mk,0], label="update x")
     ax14.legend()
     latexutils.save_fig(fig14, "NISxy.pdf")
 
@@ -558,6 +560,7 @@ if doExtraPlots:
     colorbar.ax.set_yticklabels([])
     #axCovmap.set_title(r"$|P_{xx}|$")
     axCovmap.axis("equal")
+    axCovmap.legend(loc="upper right")
 
     latexutils.save_fig(figCovmap, "cov_map.pdf")
 
@@ -567,6 +570,7 @@ if doExtraPlots:
     plot.heatmap(figGPSdistmap, axGPSdistmap, xupd[mk_first:mk,:2], GPSerror[mk_first:mk],[-200,100],[-100,200], wmax=15)
     #axGPSdistmap.set_title("GPS distance")
     axGPSdistmap.axis("equal")
+    axGPSdistmap.legend(loc="upper right")
 
     latexutils.save_fig(figGPSdistmap, "gps_error_map.pdf")
 

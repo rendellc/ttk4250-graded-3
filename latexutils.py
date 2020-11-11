@@ -2,6 +2,7 @@ import csv
 from numpy import pi, rad2deg
 
 from pathlib import Path
+import pickle
 
 PARAMETER_TO_TEXNAME = dict(
     sigma_x = r"\sigma_\text{x}",
@@ -12,6 +13,7 @@ PARAMETER_TO_TEXNAME = dict(
 )
 
 SAVE_DIR = Path(".")
+RAW_SAVE_DIR = Path("raw")
 
 def set_save_dir(dirname):
     """
@@ -24,8 +26,14 @@ def set_save_dir(dirname):
         print("Creating", SAVE_DIR)
         SAVE_DIR.mkdir()
 
-def sig_exp(num_str):
-    parts = num_str.split('.', 2)
+    raw_dir = SAVE_DIR/RAW_SAVE_DIR 
+    if not raw_dir.exists():
+        print("Creating", raw_dir)
+        raw_dir.mkdir()
+
+
+def sig_exp(f):
+    parts = f_str.split('e', 2)
     decimal = parts[1] if len(parts) > 1 else ''
     exp = -len(decimal)
     digits = parts[0].lstrip('0') + decimal
@@ -34,15 +42,16 @@ def sig_exp(num_str):
     sig = int(trimmed) if trimmed else 0
     return sig, exp
 
-def sig_exp_e(num_str):
-    v, exp = num_str.split('e')
+def sig_exp_e(f):
+    f_str = f"{f:e}"
+    v, exp = f_str.split('e')
     return float(v), int(exp)
 
 def _tentothepower(paramname, paramdict):
     p = paramdict
     pt = PARAMETER_TO_TEXNAME
 
-    v, exp = sig_exp_e(str(p[paramname]))
+    v, exp = sig_exp_e(p[paramname])
     v_str = "" if abs(v-1) < 0.0001 else str(v)
     return v_str +" 10^{" + str(exp) + "}"
 
@@ -124,7 +133,17 @@ def save_value(name, value, filename):
         writer = csv.writer(csvfile, delimiter=';',quoting=csv.QUOTE_MINIMAL)
         writer.writerow([name, value])
 
-def save_fig(fig, filename):
-    p = SAVE_DIR / filename
-    fig.savefig(p)
+def save_fig(fig, filename, saveraw=True):
+    if saveraw:
+        praw = SAVE_DIR / RAW_SAVE_DIR / filename
+        try:
+            pickle.dump(fig, praw.with_suffix(".pickle").open(mode="wb"))
+        except TypeError as e:
+            print(f"failed to pickle figure {fig}:", e)
+
+
+    pfig = SAVE_DIR / filename
+    fig.savefig(pfig)
+
+
 

@@ -185,7 +185,7 @@ P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
 # plotting
 doLivePlot = False
 if doLivePlot:
-    figLive, axLive = plt.subplots(1,2)
+    figLive, axLive = plt.subplots(1,2, num="Error plot")
     xyLiveLine, = axLive[0].plot([],[], label="ground truth")
     errLiveLine, = axLive[1].plot([],[], label="position error")
 
@@ -193,30 +193,31 @@ if doLivePlot:
     axLive[0].set_ylim([-200,200])
 
 if doAssoPlot:
-    figAsso, axAsso = plt.subplots( clear=True)
+    figAsso, axAsso = plt.subplots(num="Association plot")
 
 if doExtraPlots:
     posdiff_world = np.diff(poseGT[:,:2],axis=0)
     psidiff = np.diff(poseGT[:,2])
 
     posdiff_body = []
-    for k, heading in enumerate(poseGT[:~0,2]):
+    for k, heading in enumerate(poseGT[:N,2]):
         R = utils.rotmat2d(-heading)
         posdiff_body.append(R @ posdiff_world[k])
     posdiff_body = np.array(posdiff_body)
 
-    posodometry_error = odometry[:,:2] - posdiff_body
-    psiodometry_error = odometry[:,2] - psidiff
+    posodometry_error = odometry[:N,:2] - posdiff_body[:N]
+    psiodometry_error = odometry[:N,2] - psidiff[:N]
 
-    print("sigma_x", np.std(posodometry_error[:,0]), "[m]")
-    print("sigma_y", np.std(posodometry_error[:,1]), "[m]")
-    print("sigma_psi", np.rad2deg(np.std(psiodometry_error)), "[deg]")
+    print("Computed sigmas using ground truth")
+    print("\tsigma_x", np.std(posodometry_error[:N,0]), "[m]")
+    print("\tsigma_y", np.std(posodometry_error[:N,1]), "[m]")
+    print("\tsigma_psi", np.rad2deg(np.std(psiodometry_error[:N])), "[deg]")
 
-    figOdoErr, axOdoErr = plt.subplots(2,1, sharex=True)
-    axOdoErr[0].plot(t, posodometry_error[:,0], label="odom error x")
-    axOdoErr[0].plot(t, posodometry_error[:,1], label="odom error y")
+    figOdoErr, axOdoErr = plt.subplots(2,1, sharex=True, num="Odometry error")
+    axOdoErr[0].plot(t, posodometry_error[:N,0], label="odom error x")
+    axOdoErr[0].plot(t, posodometry_error[:N,1], label="odom error y")
     axOdoErr[0].legend(loc="upper right")
-    axOdoErr[1].plot(t, np.rad2deg(psiodometry_error), label=r"odom error $\psi$")
+    axOdoErr[1].plot(t, np.rad2deg(psiodometry_error[:N]), label=r"odom error $\psi$")
     axOdoErr[1].legend(loc="upper right")
 
     latexutils.save_fig(figOdoErr, "odom_error.pdf")
@@ -305,7 +306,8 @@ offsets = ranges * 0.2
 mins -= offsets
 maxs += offsets
 
-fig2, ax2 = plt.subplots(clear=True)
+fig2, ax2 = plt.subplots(clear=True, num="Trajectory and Landmarks")
+
 # landmarks
 ax2.scatter(*landmarks.T, c="r", marker="^")
 ax2.scatter(*lmk_est_final.T, c="b", marker=".")
@@ -332,10 +334,10 @@ CI3 = chi2.interval(confprob, 3)
 CI1N = np.array(chi2.interval(confprob, 1*N)) / N
 CI2N = np.array(chi2.interval(confprob, 2*N)) / N
 CI3N = np.array(chi2.interval(confprob, 3*N)) / N
-df_anis = 2 * sum([np.count_nonzero(ak > -1) for ak in a])
-CIANIS = np.array(chi2.interval(confprob, df_anis))/len(NIS)
-df_rangebearing = sum([np.count_nonzero(ak > -1) for ak in a])
-CIANIS_rangebearing = np.array(chi2.interval(confprob, df_rangebearing))/len(NIS_bearing)
+df_anis = 2 * sum([np.count_nonzero(ak > -1) for ak in a[:N]])
+CIANIS = np.array(chi2.interval(confprob, df_anis))/N
+df_rangebearing = sum([np.count_nonzero(ak > -1) for ak in a[:N]])
+CIANIS_rangebearing = np.array(chi2.interval(confprob, df_rangebearing))/N
 
 NEESpose, NEESpos, NEESpsi = NEESes.T
 insideCIpose = (CI3[0] <= NEESpose) * (NEESpose <= CI3[1])
@@ -345,12 +347,12 @@ insideCIrange = (CInorm_rangebearing[:N,0] <= NISnorm_range[:N]) * (NISnorm_rang
 insideCIbearing = (CInorm_rangebearing[:N,0] <= NISnorm_bearing[:N]) * (NISnorm_bearing[:N] <= CInorm_rangebearing[:N,1])
 
 
-ANEESpose = NEESpose.mean()
-ANEESpos = NEESpos.mean()
-ANEESpsi = NEESpsi.mean()
-ANIS = NIS.mean()
-ANIS_range = NIS_range.mean()
-ANIS_bearing = NIS_bearing.mean()
+ANEESpose = NEESpose[:N].mean()
+ANEESpos = NEESpos[:N].mean()
+ANEESpsi = NEESpsi[:N].mean()
+ANIS = NIS[:N].mean()
+ANIS_range = NIS_range[:N].mean()
+ANIS_bearing = NIS_bearing[:N].mean()
 
 insideCI = (CInorm[:N,0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N,1])
 
@@ -376,7 +378,7 @@ print(f"{'NIS':<20} {insideCI.mean():.1%} inside")
 
 # NIS
 
-fig3, ax3 = plt.subplots(clear=True)
+fig3, ax3 = plt.subplots(clear=True, num="NIS")
 nis_str = f"NIS ({insideCI.mean():.1%} inside)"
 plot.pretty_NEESNIS(ax3, t, NISnorm[:N], nis_str, CInorm[:N,0], CInorm[:N,1])
 ax3.legend(loc="upper right")
@@ -386,13 +388,13 @@ latexutils.save_fig(fig3, "NIS.pdf")
 
 # NEES
 
-fig4, ax4 = plt.subplots(nrows=3, ncols=1, clear=True, sharex=True)
+fig4, ax4 = plt.subplots(nrows=3, ncols=1, sharex=True, num="NEESes")
 pose_str = f"NEES pose ({insideCIpose.mean():.1%} inside)"
-plot.pretty_NEESNIS(ax4[0], t, NEESpose, pose_str, CI3[0], CI3[1])
+plot.pretty_NEESNIS(ax4[0], t, NEESpose[:N], pose_str, CI3[0], CI3[1])
 pos_str = f"NEES pos ({insideCIpos.mean():.1%} inside)"
-plot.pretty_NEESNIS(ax4[1], t, NEESpos, pos_str, CI2[0], CI2[1])
+plot.pretty_NEESNIS(ax4[1], t, NEESpos[:N], pos_str, CI2[0], CI2[1])
 psi_str = f"NEES heading ({insideCIpsi.mean():.1%} inside)"
-plot.pretty_NEESNIS(ax4[2], t, NEESpsi, psi_str, CI1[0], CI1[1])
+plot.pretty_NEESNIS(ax4[2], t, NEESpsi[:N], psi_str, CI1[0], CI1[1])
 
 for ax in ax4:
     ax.legend(loc="upper right")
@@ -406,7 +408,7 @@ latexutils.save_fig(fig4, "NEES.pdf")
 
 
 # Decomposed NISes
-fig, axs = plt.subplots(2,1, sharex=True)
+fig, axs = plt.subplots(2,1, sharex=True, num="Decomposed NISes")
 range_str = f"NIS range ({insideCIrange.mean():.1%} inside)"
 plot.pretty_NEESNIS(axs[0], t, NISnorm_range[:N], range_str, CInorm_rangebearing[:N,0], CInorm_rangebearing[:N,1])
 bearing_str = f"NIS bearing ({insideCIbearing.mean():.1%} inside)"
@@ -427,7 +429,7 @@ heading_rmse = np.sqrt((heading_err**2).mean())
 print("Position RMSE", pos_rmse)
 print("Heading RMSE", heading_rmse)
 
-fig5, ax5 = plt.subplots(nrows=2, ncols=1, clear=True, sharex=True)
+fig5, ax5 = plt.subplots(nrows=2, ncols=1, sharex=True, num="Errors over time")
 
 ax5[0].plot(t,pos_err, label=f"Position error ({pos_rmse:.3f})")
 #ax5[0].plot([t[0],t[~0]], [pos_rmse]*2, label="Position RMSE")
@@ -501,10 +503,10 @@ if playMovie:
         )
 
 if doExtraPlots:
-    figCovmap, axCovmap = plt.subplots(1,1)
-    P_pose_hat = [P_hat[k][:3,:3] for k in range(len(P_hat))]
+    figCovmap, axCovmap = plt.subplots(1,1, num="Pose covariance norm map")
+    P_pose_hat = [P_hat[k][:3,:3] for k in range(N)]
     P_norms = np.array([np.linalg.norm(P) for P in P_pose_hat])
-    pos = np.array([eta_hat[k][:2] for k in range(len(eta_hat))])
+    pos = np.array([eta_hat[k][:2] for k in range(N)])
     #axCovmap.plot(pos[:,0], pos[:,1], c="g", label="slam")
     axCovmap.scatter(poseGT[0,0], poseGT[0,1], s=1, c="k", label="start")
     colorbar = plot.heatmap(figCovmap, axCovmap, pos, P_norms, [-150,50], [-50,150])
@@ -516,7 +518,7 @@ if doExtraPlots:
 
     distance_from_start = np.linalg.norm(poseGT[:N,:2] - poseGT[0,:2], axis=1)
 
-    figErrmap, axErrmap = plt.subplots(1,1)
+    figErrmap, axErrmap = plt.subplots(1,1, num="Ground truth error map")
     colorbar = plot.heatmap(figErrmap, axErrmap, pos, pos_err, [-150,50], [-50,150])
     colorbar.ax.set_yticklabels(["0", f'{np.max(pos_err)/2:.1f}', f"{np.max(pos_err):.1f}"])
     #axErrmap.set_title("Position estimate error")
@@ -526,14 +528,6 @@ if doExtraPlots:
     axErrmap.legend(loc="upper right")
 
     latexutils.save_fig(figErrmap, "pos_error_map.pdf")
-
-
-    figErrdist, axErrdist = plt.subplots(1,1)
-    axErrdist.scatter(distance_from_start, pos_err)
-    axErrdist.set_xlabel(r"$||x - x_0||$")
-    axErrdist.set_ylabel(r"$||\rho_k - x_k||$")
-
-    latexutils.save_fig(figErrdist, "error_distance.pdf")
 
 
 

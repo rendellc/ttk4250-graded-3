@@ -244,7 +244,7 @@ def boxplot(ax, datas, ndim, labels):
     ax.set_yticks([])
     ax.tick_params(axis="x", which="minor", length=0)
 
-def pretty_NEESNIS(ax, t, neesnis, label, CIlow, CIhigh, fillCI=False, color="tab:gray"):
+def pretty_NEESNIS(ax, t, neesnis, label, CIlow, CIhigh, fillCI=False, color="tab:gray",lineCI=True):
     ax.plot(t, neesnis, label=label)
 
     CIhighmax = np.max(1.5*CIhigh) # y limit if decided by CI
@@ -252,9 +252,14 @@ def pretty_NEESNIS(ax, t, neesnis, label, CIlow, CIhigh, fillCI=False, color="ta
     ax.fill_between(t, np.zeros_like(CIlow), CIlow, facecolor=color, alpha=0.5) 
     ax.fill_between(t, CIhigh, yUpper, facecolor=color, alpha=0.5)
 
+    if lineCI:
+        ax.plot(t, np.ones_like(t)*CIlow, c=color, linewidth=0.5)
+        ax.plot(t, np.ones_like(t)*CIhigh, c=color, linewidth=0.5)
+
     ax.set_xlim([t[0], t[~0]])
 
     ax.set_ylim([0, yUpper])
+
 
 def plot_NEES(ax, delta_x, P, t, state_indices):
     NEES = [eskf._NEES(P[k][state_indices**2], delta_x[k][state_indices]) for k in range(len(t))]
