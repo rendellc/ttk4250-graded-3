@@ -114,12 +114,11 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-latexutils.set_save_dir("real_results_redo")
-
+latexutils.set_save_dir("real_results")
 parameters = dict(
-    sigma_x = 0.01,
-    sigma_y = 0.01,
-    sigma_psi = np.deg2rad(0.2),
+    sigma_x = 0.08,
+    sigma_y = 0.000000001,
+    sigma_psi = np.deg2rad(0.01),
     sigma_range = 0.1,
     sigma_bearing = np.deg2rad(0.2),
     alpha_individual = 1e-5, # probability of not associating actual measurement
@@ -189,7 +188,7 @@ mk = mk_first
 t = timeOdo[0]
 
 # %%  run
-N = K
+N = 4000
 
 doPlot = False
 doExtraPlots = True
@@ -376,6 +375,7 @@ latexutils.save_fig(figGps, "gps_distance_split.pdf")
 # %% Consistency
 
 # Confidence intervals
+CI1N = np.array(chi2.interval(confprob, 1*N)) / N
 CI2N = np.array(chi2.interval(confprob, 2*N)) / N
 
 df_anis = 2 * sum([np.count_nonzero(ak > -1) for ak in a[mk_first:mk]])
@@ -399,15 +399,21 @@ ANIS = NIS[mk_first:mk].mean()
 ANIS_range = NIS_range[mk_first:mk].mean()
 ANIS_bearing = NIS_bearing[mk_first:mk].mean()
 ANISxy = NISxy[:gpsk].mean()
+ANISxyraw = NISxyraw[:gpsk].mean()
+ANISxraw = NISxraw[:gpsk].mean()
+ANISyraw = NISyraw[:gpsk].mean()
 
 print(f"{'ANIS':<20} {ANIS:<20.3f}\t{CIANIS}")
 print(f"{'ANIS xy':<20} {ANISxy:<20.3f}\t{CI2N}")
 print(f"{'ANIS range':<20} {ANIS_range:<20.3f}\t{CIANIS_rangebearing}")
 print(f"{'ANIS bearing':<20} {ANIS_bearing:<20.3f}\t{CIANIS_rangebearing}")
+print(f"{'ANIS xy raw':<20} {ANISxyraw:<20.3f}\t{CI2N}")
+print(f"{'ANIS x raw':<20} {ANISxraw:<20.3f}\t{CI1N}")
+print(f"{'ANIS y raw':<20} {ANISyraw:<20.3f}\t{CI1N}")
 
 consistencydatas = [
         dict(avg=ANIS,inside=insideCI.mean(), text="NIS",CI=CIANIS),
-        #dict(avg=ANISxy,inside=insideCIxy.mean(), text="NIS xy",CI=CI2),
+        dict(avg=ANISxy,inside=insideCIxy.mean(), text="NIS xy",CI=CI2),
         dict(avg=ANIS_range,inside=insideCIrange.mean(), text="NIS range",CI=CIANIS_rangebearing),
         dict(avg=ANIS_bearing,inside=insideCIbearing.mean(), text="NIS bearing",CI=CIANIS_rangebearing),
 ]
