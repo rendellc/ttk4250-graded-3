@@ -114,16 +114,16 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-latexutils.set_save_dir("real_results")
+latexutils.set_save_dir("real_results_redo")
 
 parameters = dict(
-    sigma_x = 0.02,
-    sigma_y = 0.02,
+    sigma_x = 0.01,
+    sigma_y = 0.01,
     sigma_psi = np.deg2rad(0.2),
     sigma_range = 0.1,
     sigma_bearing = np.deg2rad(0.2),
-    alpha_individual = 1e-10, # probability of not associating actual measurement
-    alpha_joint = 1e-11,
+    alpha_individual = 1e-5, # probability of not associating actual measurement
+    alpha_joint = 1e-7,
     alpha_consistency = 0.05,
 )
 p = parameters
@@ -362,7 +362,16 @@ for k in tqdm(range(N)):
 axGps.plot(timeGps[:gpsk],GPSerror[:gpsk],label="GPS distance")
 axGps.set_ylim(0,25)
 axGps.set_xlim(timeGps[0],timeGps[gpsk])
+axGps.set_xlabel(r"$t$")
+axGps.set_ylabel(r"[m]")
 latexutils.save_fig(figGps, "gps_distance.pdf")
+
+figGps, axGps = plt.subplots(2,1, sharex=True, gridspec_kw={'height_ratios': [1, 3]})
+plot.splitplot(axGps[0], axGps[1], timeGps[:gpsk], GPSerror[:gpsk], "GPS distance", [20, 130], topscale=1/3)
+axGps[0].legend(loc="upper left")
+axGps[1].set_xlabel(r"$t$")
+axGps[1].set_ylabel(r"[m]")
+latexutils.save_fig(figGps, "gps_distance_split.pdf")
 
 # %% Consistency
 
@@ -410,6 +419,7 @@ fig3, ax3 = plt.subplots(clear=True)
 nis_str = f"NIS ({insideCI.mean():.1%} inside)"
 plot.pretty_NEESNIS(ax3, timeLsr[mk_first:mk], NISnorm[mk_first:mk], nis_str, CInorm[mk_first:mk,0], CInorm[mk_first:mk,1])
 ax3.legend()
+ax3.set_xlabel(r"$t$")
 latexutils.save_fig(fig3, "NIS.pdf")
 
 # Decomposed NISes
@@ -423,6 +433,7 @@ plot.pretty_NEESNIS(axs[1], timeLsr[mk_first:mk], NISnorm_bearing[mk_first:mk], 
 for ax in axs:
     ax.legend(loc="upper right")
 fig.tight_layout()
+axs[1].set_xlabel(r"$t$")
 
 latexutils.save_fig(fig, "NIS_decomposed.pdf")
 
@@ -478,10 +489,15 @@ if do_raw_prediction:
 fig6, ax6 = plt.subplots(clear=True)
 ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x")
 ax6.plot(*xupd[mk_first:mk, :2].T)
-ax6.set(
-    title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
-)
+title_str = f"steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2}, measurements {z.shape[0]}, num new {np.sum(a[mk] == -1)}" 
+ax6.set_title(title_str)
+
 latexutils.save_fig(fig6, "finalupdate.pdf")
+ax6.set_title("")
+latexutils.save_value("finalupdate_title_caption", r"\caption{Estimated trajectory and map. " + title_str + "}", "finalupdate_title_caption.csv")
+latexutils.save_value("finalupdate_title", title_str, "finalupdate_title.csv")
+latexutils.save_fig(fig6, "finalupdate_notitle.pdf")
+
 
 # %%
 if doExtraPlots:

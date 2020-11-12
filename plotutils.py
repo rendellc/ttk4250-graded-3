@@ -338,3 +338,28 @@ def heatmap(fig, ax, pos, weights, xlim=None, ylim=None, bins=50, cmin=None, wmi
     return colorbar
 
 
+def splitplot(axtop, axbottom, xdata, ydata, label, y_skips, topscale=1):
+    axbottom.plot(xdata, ydata, label=label)
+    axtop.plot(xdata, ydata, label=label)
+
+    axbottom.set_ylim(np.min(ydata), y_skips[0])
+    axtop.set_ylim(y_skips[1], 150)
+    axbottom.set_xlim(xdata[0], xdata[~0])
+
+    axtop.spines["bottom"].set_visible(False)
+    axtop.xaxis.tick_top()
+    axtop.tick_params(labeltop=False)
+
+    axbottom.spines["top"].set_visible(False)
+    axbottom.xaxis.tick_bottom()
+    d = .015  # how big to make the diagonal lines in axes coordinates
+    dtop = d/topscale
+    # arguments to pass to plot, just so we don't keep repeating them
+    kwargs = dict(transform=axtop.transAxes, color='k', clip_on=False)
+    axtop.plot((-d, +d), (-dtop, +dtop), **kwargs)        # top-left diagonal
+    axtop.plot((1 - d, 1 + d), (-dtop, +dtop), **kwargs)  # top-right diagonal
+
+    kwargs.update(transform=axbottom.transAxes)  # switch to the bottom axes
+    axbottom.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+    axbottom.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+
